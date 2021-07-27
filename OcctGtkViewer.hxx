@@ -22,9 +22,13 @@
 #ifndef _OcctGtkViewer_HeaderFile
 #define _OcctGtkViewer_HeaderFile
 
+#include <Standard_Type.hxx>
+
 #include <gtkmm.h>
 
 #include <vector>
+
+class OpenGl_Context;
 
 //! GTK window widget with embedded OCCT Viewer.
 class OcctGtkViewer : public Gtk::Window
@@ -52,6 +56,13 @@ protected:
   void onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj);
 
 protected:
+
+  //! Print OpenGL context info.
+  void dumpGlInfo (bool theIsBasic);
+
+protected:
+
+  Handle(OpenGl_Context) myGlCtx;
 
   Gtk::Box    myVBox;
   Gtk::GLArea myGLArea;

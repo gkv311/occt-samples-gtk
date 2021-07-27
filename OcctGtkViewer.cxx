@@ -21,9 +21,8 @@
 
 #include "OcctGtkViewer.hxx"
 
-#include <iostream>
-
-#include <epoxy/gl.h>
+#include <Message.hxx>
+#include <OpenGl_Context.hxx>
 
 // ================================================================
 // Function : OcctGtkViewer
@@ -37,9 +36,7 @@ OcctGtkViewer::OcctGtkViewer()
   set_title ("OCCT gtkmm Viewer sample");
   set_default_size (720, 480);
 
-  //myVBox.set_margin (12);
   myVBox.set_spacing (6);
-  //set_child (myVBox);
   add (myVBox);
 
   myGLArea.set_hexpand (true);
@@ -60,7 +57,7 @@ OcctGtkViewer::OcctGtkViewer()
   {
     Gtk::Box* aSliderBox = Gtk::manage (new Gtk::Box());
 
-    Gtk::Label* aLabel = Gtk::manage (new Gtk::Label ("Axis"));
+    Gtk::Label* aLabel = Gtk::manage (new Gtk::Label ("Background"));
     aSliderBox->add (*aLabel);
     aLabel->show();
 
@@ -91,6 +88,50 @@ OcctGtkViewer::~OcctGtkViewer()
 }
 
 // ================================================================
+// Function : dumpGlInfo
+// Purpose  :
+// ================================================================
+void OcctGtkViewer::dumpGlInfo (bool theIsBasic)
+{
+  TColStd_IndexedDataMapOfStringString aGlCapsDict;
+  myGlCtx->DiagnosticInformation (aGlCapsDict, theIsBasic ? Graphic3d_DiagnosticInfo_Basic : Graphic3d_DiagnosticInfo_Complete);
+  if (theIsBasic)
+  {
+    TCollection_AsciiString aViewport;
+    aGlCapsDict.FindFromKey ("Viewport", aViewport);
+    aGlCapsDict.Clear();
+    aGlCapsDict.Add ("Viewport", aViewport);
+  }
+
+  // beautify output
+  {
+    TCollection_AsciiString* aGlVer   = aGlCapsDict.ChangeSeek ("GLversion");
+    TCollection_AsciiString* aGlslVer = aGlCapsDict.ChangeSeek ("GLSLversion");
+    if (aGlVer   != NULL
+     && aGlslVer != NULL)
+    {
+      *aGlVer = *aGlVer + " [GLSL: " + *aGlslVer + "]";
+      aGlslVer->Clear();
+    }
+  }
+
+  TCollection_AsciiString anInfo;
+  for (TColStd_IndexedDataMapOfStringString::Iterator aValueIter (aGlCapsDict); aValueIter.More(); aValueIter.Next())
+  {
+    if (!aValueIter.Value().IsEmpty())
+    {
+      if (!anInfo.IsEmpty())
+      {
+        anInfo += "\n";
+      }
+      anInfo += aValueIter.Key() + ": " + aValueIter.Value();
+    }
+  }
+
+  Message::SendWarning (anInfo);
+}
+
+// ================================================================
 // Function : onValueChanged
 // Purpose  :
 // ================================================================
@@ -107,14 +148,20 @@ void OcctGtkViewer::onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj)
 void OcctGtkViewer::onGlAreaRealized()
 {
   myGLArea.make_current();
+  myGlCtx = new OpenGl_Context();
+  if (!myGlCtx->Init (true))
+  {
+    Message::SendFail() << "Error: Unable to wrap OpenGL context";
+  }
+  dumpGlInfo (false);
   try
   {
     myGLArea.throw_if_error();
   }
   catch (const Gdk::GLError& theGlErr)
   {
-    std::cerr << "An error occured making the context current during realize:\n"
-              << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
+    Message::SendFail() << "An error occured making the context current during realize:\n"
+                        << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what();
   }
 }
 
@@ -125,14 +172,15 @@ void OcctGtkViewer::onGlAreaRealized()
 void OcctGtkViewer::onGlAreaReleased()
 {
   myGLArea.make_current();
+  myGlCtx.Nullify();
   try
   {
     myGLArea.throw_if_error();
   }
   catch (const Gdk::GLError& theGlErr)
   {
-    std::cerr << "An error occured making the context current during unrealize\n"
-              << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
+    Message::SendFail() << "An error occured making the context current during unrealize\n"
+                        << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
   }
 }
 
@@ -146,18 +194,22 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
   try
   {
     myGLArea.throw_if_error();
+    if (myGlCtx.IsNull())
+    {
+      return false;
+    }
 
     float aVal = myRotAngle / 360.0f;
-    glClearColor (aVal, aVal, aVal, 1.0);
-    glClear (GL_COLOR_BUFFER_BIT);
-    glFlush();
+    myGlCtx->core11fwd->glClearColor (aVal, aVal, aVal, 1.0);
+    myGlCtx->core11fwd->glClear (GL_COLOR_BUFFER_BIT);
+    myGlCtx->core11fwd->glFlush();
 
     return true;
   }
   catch (const Gdk::GLError& theGlErr)
   {
-    std::cerr << "An error occurred in the render callback of the GLArea\n"
-              << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
+    Message::SendFail() << "An error occurred in the render callback of the GLArea\n"
+                        << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
     return false;
   }
 }
