@@ -22,16 +22,22 @@
 #ifndef _OcctGtkViewer_HeaderFile
 #define _OcctGtkViewer_HeaderFile
 
-#include <Standard_Type.hxx>
+#include <AIS_InteractiveContext.hxx>
+#include <AIS_ViewController.hxx>
+#include <AIS_ViewCube.hxx>
+#include <Aspect_NeutralWindow.hxx>
+#include <V3d_Viewer.hxx>
+#include <V3d_View.hxx>
 
 #include <gtkmm.h>
 
 #include <vector>
 
+class Aspect_NeutralWindow;
 class OpenGl_Context;
 
 //! GTK window widget with embedded OCCT Viewer.
-class OcctGtkViewer : public Gtk::Window
+class OcctGtkViewer : public Gtk::Window, public AIS_ViewController
 {
 public:
 
@@ -62,7 +68,10 @@ protected:
 
 protected:
 
-  Handle(OpenGl_Context) myGlCtx;
+  Handle(V3d_Viewer)               myViewer;
+  Handle(V3d_View)                 myView;
+  Handle(AIS_InteractiveContext)   myContext;
+  Handle(AIS_ViewCube)             myViewCube;  //!< view cube object
 
   Gtk::Box    myVBox;
   Gtk::GLArea myGLArea;

@@ -23,6 +23,31 @@
 
 #include <Message.hxx>
 #include <OpenGl_Context.hxx>
+#include <OpenGl_GraphicDriver.hxx>
+#include <OpenGl_FrameBuffer.hxx>
+
+#include <gdk/gdkx.h>
+#include <X11/Xlib.h>
+
+//! FBO wrapper.
+class OcctFboWrapper : public OpenGl_FrameBuffer
+{
+  DEFINE_STANDARD_RTTI_INLINE(OcctFboWrapper, OpenGl_FrameBuffer)
+public:
+  //! Empty constructor.
+  OcctFboWrapper() {}
+
+  //! Initialize FBO.
+  bool InitWrapperLazy (const Handle(OpenGl_Context)& theCtx, GLuint theFboId)
+  {
+    if (myGlFBufferId == theFboId)
+    {
+      return true;
+    }
+
+    return InitWrapper (theCtx);
+  }
+};
 
 // ================================================================
 // Function : OcctGtkViewer
@@ -33,6 +58,35 @@ OcctGtkViewer::OcctGtkViewer()
   myQuitButton ("Quit"),
   myRotAngle (0.0f)
 {
+  Handle(Aspect_DisplayConnection) aDisp = new Aspect_DisplayConnection();
+  Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver (aDisp, false);
+  aDriver->ChangeOptions().buffersNoSwap = true;
+  aDriver->ChangeOptions().buffersOpaqueAlpha = true;
+  aDriver->ChangeOptions().useSystemBuffer = false;
+
+  // create viewer
+  myViewer = new V3d_Viewer (aDriver);
+  myViewer->SetDefaultBackgroundColor (Quantity_NOC_BLACK);
+  //myViewer->SetDefaultBackgroundColor (Quantity_NOC_RED);
+  myViewer->SetDefaultLights();
+  myViewer->SetLightOn();
+
+  // create AIS context
+  myContext = new AIS_InteractiveContext (myViewer);
+
+  myViewCube = new AIS_ViewCube();
+  myViewCube->SetViewAnimation (myViewAnimation);
+  myViewCube->SetFixedAnimationLoop (false);
+  myViewCube->SetAutoStartAnimation (true);
+
+  myView = myViewer->CreateView();
+  myView->SetImmediateUpdate (false);
+  myView->ChangeRenderingParams().ToShowStats = true;
+  myView->ChangeRenderingParams().CollectedStats = (Graphic3d_RenderingParams::PerfCounters )
+    (Graphic3d_RenderingParams::PerfCounters_FrameRate
+   | Graphic3d_RenderingParams::PerfCounters_Triangles);
+
+  // widgets
   set_title ("OCCT gtkmm Viewer sample");
   set_default_size (720, 480);
 
@@ -94,7 +148,7 @@ OcctGtkViewer::~OcctGtkViewer()
 void OcctGtkViewer::dumpGlInfo (bool theIsBasic)
 {
   TColStd_IndexedDataMapOfStringString aGlCapsDict;
-  myGlCtx->DiagnosticInformation (aGlCapsDict, theIsBasic ? Graphic3d_DiagnosticInfo_Basic : Graphic3d_DiagnosticInfo_Complete);
+  myView->DiagnosticInformation (aGlCapsDict, theIsBasic ? Graphic3d_DiagnosticInfo_Basic : Graphic3d_DiagnosticInfo_Complete);
   if (theIsBasic)
   {
     TCollection_AsciiString aViewport;
@@ -148,20 +202,64 @@ void OcctGtkViewer::onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj)
 void OcctGtkViewer::onGlAreaRealized()
 {
   myGLArea.make_current();
-  myGlCtx = new OpenGl_Context();
-  if (!myGlCtx->Init (true))
+  Graphic3d_Vec2i aViewSize (myGLArea.get_width(), myGLArea.get_height());
+
+  Handle(OpenGl_Context) aGlCtx = new OpenGl_Context();
+  if (!aGlCtx->Init (true))
   {
     Message::SendFail() << "Error: Unable to wrap OpenGL context";
+    return;
   }
-  dumpGlInfo (false);
+
   try
   {
+    OCC_CATCH_SIGNALS
     myGLArea.throw_if_error();
+
+    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
+    if (!aWindow.IsNull())
+    {
+      aWindow->SetSize (aViewSize.x(), aViewSize.y());
+      myView->SetWindow (aWindow, aGlCtx->RenderingContext());
+      dumpGlInfo (true);
+    }
+    else
+    {
+      myViewer->Driver()->GetDisplayConnection()->Init ((Aspect_XDisplay* )aGlCtx->GetDisplay());
+
+//::Window www = gdk_x11_drawable_get_xid (gobj());
+//::Window www = gdk_x11_window_get_xid (gobj());
+//::Window www = gdk_x11_window_get_xid (gtk_widget_get_window (myGLArea.gobj()));
+::Window www = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
+//::Window www = aGlCtx->Window();
+
+      aWindow = new Aspect_NeutralWindow();
+      aWindow->SetNativeHandle (www);
+      aWindow->SetSize (aViewSize.x(), aViewSize.y());
+
+
+
+Message::SendWarning() << "Window: " << aGlCtx->Window() << "; www: " << www << "; Ctx: " << aGlCtx->RenderingContext() << "; Size: " << aViewSize.x() << "x" << aViewSize.y()
+                       << "; XServerVendor= " << XServerVendor ((Display* )aGlCtx->GetDisplay());
+//XWindowAttributes aWinAttribs;
+//XGetWindowAttributes ((Display* )aGlCtx->GetDisplay(), (::Window )aGlCtx->Window(), &aWinAttribs);
+//XGetWindowAttributes ((Display* )aGlCtx->GetDisplay(), www, &aWinAttribs);
+
+      myView->SetWindow (aWindow, aGlCtx->RenderingContext());
+      dumpGlInfo (false);
+
+      myContext->Display (myViewCube, 0, 0, false);
+    }
   }
   catch (const Gdk::GLError& theGlErr)
   {
     Message::SendFail() << "An error occured making the context current during realize:\n"
                         << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what();
+  }
+  catch (const Standard_Failure& theErr)
+  {
+    Message::SendFail() << "An error occured making the context current during realize:\n"
+                        << theErr;
   }
 }
 
@@ -172,7 +270,8 @@ void OcctGtkViewer::onGlAreaRealized()
 void OcctGtkViewer::onGlAreaReleased()
 {
   myGLArea.make_current();
-  myGlCtx.Nullify();
+  /// TODO
+  /// myView.Nullify();
   try
   {
     myGLArea.throw_if_error();
@@ -194,16 +293,38 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
   try
   {
     myGLArea.throw_if_error();
-    if (myGlCtx.IsNull())
+
+    // wrap FBO created by Qt
+    Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
+    const Handle(OpenGl_Context)& aGlCtx = aDriver->GetSharedContext();
+    Handle(OcctFboWrapper) aDefaultFbo = Handle(OcctFboWrapper)::DownCast (aGlCtx->DefaultFrameBuffer());
+    if (aDefaultFbo.IsNull())
     {
-      return false;
+      aDefaultFbo = new OcctFboWrapper();
+      aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
+    }
+    //if (myToResize)
+    {
+      //aDefaultFbo->Release (aGlCtx.get());
+    }
+    if (!aDefaultFbo->InitWrapper (aGlCtx))
+    ///if (!aDefaultFbo->InitWrapperLazy (aGlCtx, defaultFramebufferObject()))
+    {
+      aDefaultFbo.Nullify();
+      Message::DefaultMessenger()->Send ("Default FBO wrapper creation failed\n", Message_Fail);
+    }
+
+    //if (myToResize)
+    {
+      //myToResize = false;
+      //myView->MustBeResized();
     }
 
     float aVal = myRotAngle / 360.0f;
-    myGlCtx->core11fwd->glClearColor (aVal, aVal, aVal, 1.0);
-    myGlCtx->core11fwd->glClear (GL_COLOR_BUFFER_BIT);
-    myGlCtx->core11fwd->glFlush();
-
+    //myGlCtx->core11fwd->glClearColor (aVal, aVal, aVal, 1.0);
+    //myGlCtx->core11fwd->glClear (GL_COLOR_BUFFER_BIT);
+    //myGlCtx->core11fwd->glFlush();
+    myView->Redraw();
     return true;
   }
   catch (const Gdk::GLError& theGlErr)

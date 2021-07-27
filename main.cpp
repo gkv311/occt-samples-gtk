@@ -21,10 +21,15 @@
 
 #include "OcctGtkViewer.hxx"
 
+#include <OSD.hxx>
+
 #include <gtkmm.h>
 
 int main (int theNbArgs, char* theArgVec[])
 {
+  OSD::SetSignal (false);
+  OSD::SetSignalStackTraceLength (10);
+
   Glib::RefPtr<Gtk::Application> aGtkApp = Gtk::Application::create (theNbArgs, theArgVec, "org.opencascade.gtkexample");
 
   OcctGtkViewer aGtkWin;
