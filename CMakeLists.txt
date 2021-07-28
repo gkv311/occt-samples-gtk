@@ -51,6 +51,7 @@ target_link_libraries (${PROJECT_NAME} PRIVATE ${anOcctLibs})
 target_link_libraries (${PROJECT_NAME} PRIVATE ${GTKMM_LIBRARIES} ${OPENGL_LIBRARIES})
 
 if (UNIX)
+  target_link_libraries (${PROJECT_NAME} PRIVATE EGL)
   target_link_libraries (${PROJECT_NAME} PRIVATE X11)
   target_link_libraries (${PROJECT_NAME} PRIVATE dl)
   target_link_libraries (${PROJECT_NAME} PRIVATE pthread)

@@ -29,6 +29,8 @@
 #include <gdk/gdkx.h>
 #include <X11/Xlib.h>
 
+#include <EGL/egl.h>
+
 // ================================================================
 // Function : OcctGtkViewer
 // Purpose  :
@@ -308,10 +310,21 @@ void OcctGtkViewer::onGlAreaRealized()
   myGLArea.make_current();
   Graphic3d_Vec2i aViewSize (myGLArea.get_width(), myGLArea.get_height());
 
+  void* aEglCtx = eglGetCurrentContext();
+  if (aEglCtx != EGL_NO_CONTEXT)
+  {
+    Message::SendFail() << "Error: Wayland session (EGL context) is not unsuppored";
+    Gtk::MessageDialog aMsg ("Error: Wayland session (EGL context) is not unsuppored", false, Gtk::MESSAGE_ERROR);
+    aMsg.run();
+    return;
+  }
+
   Handle(OpenGl_Context) aGlCtx = new OpenGl_Context();
   if (!aGlCtx->Init (true))
   {
-    Message::SendFail() << "Error: Unable to wrap OpenGL context";
+    Message::SendFail() << "Error: OpenGl_Context is unable to wrap OpenGL context";
+    Gtk::MessageDialog aMsg ("Error: OpenGl_Context is unable to wrap OpenGL context", false, Gtk::MESSAGE_ERROR);
+    aMsg.run();
     return;
   }
 
@@ -383,6 +396,11 @@ void OcctGtkViewer::onGlAreaReleased()
 bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx)
 {
   (void )theGlCtx;
+  if (myView->Window().IsNull())
+  {
+    return false;
+  }
+
   try
   {
     myGLArea.throw_if_error();
