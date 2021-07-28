@@ -65,6 +65,7 @@ OcctGtkViewer::OcctGtkViewer()
 
   // note - window will be created later within onGlAreaRealized() callback!
   myView = myViewer->CreateView();
+  myView->SetImmediateUpdate (false);
   myView->ChangeRenderingParams().ToShowStats = true;
   myView->ChangeRenderingParams().CollectedStats = (Graphic3d_RenderingParams::PerfCounters )
     (Graphic3d_RenderingParams::PerfCounters_FrameRate
@@ -186,6 +187,7 @@ void OcctGtkViewer::onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj)
 {
   float aVal = theAdj->get_value() / 360.0f;
   myView->SetBackgroundColor (Quantity_Color (aVal, aVal, aVal, Quantity_TOC_sRGB));
+  myView->Invalidate();
   myGLArea.queue_draw();
 }
 
@@ -405,16 +407,6 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
   {
     myGLArea.throw_if_error();
 
-    Graphic3d_Vec2i aViewSizeOld;
-    Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
-    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
-    aWindow->Size (aViewSizeOld.x(), aViewSizeOld.y());
-    if (aViewSizeNew != aViewSizeOld)
-    {
-      aWindow->SetSize (aViewSizeNew.x(), aViewSizeNew.y());
-      myView->MustBeResized();
-    }
-
     // wrap FBO created by Gtk::GLArea
     Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
     const Handle(OpenGl_Context)& aGlCtx = aDriver->GetSharedContext();
@@ -424,11 +416,22 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
       aDefaultFbo = new OpenGl_FrameBuffer();
       aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
     }
-
     if (!aDefaultFbo->InitWrapper (aGlCtx))
     {
       aDefaultFbo.Nullify();
       Message::DefaultMessenger()->Send ("Default FBO wrapper creation failed\n", Message_Fail);
+      return false;
+    }
+
+    Graphic3d_Vec2i aViewSizeOld;
+    Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
+    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
+    aWindow->Size (aViewSizeOld.x(), aViewSizeOld.y());
+    if (aViewSizeNew != aViewSizeOld)
+    {
+      aWindow->SetSize (aViewSizeNew.x(), aViewSizeNew.y());
+      myView->MustBeResized();
+      myView->Invalidate();
     }
 
     // flush pending input events and redraw the viewer
