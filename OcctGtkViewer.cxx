@@ -29,39 +29,21 @@
 #include <gdk/gdkx.h>
 #include <X11/Xlib.h>
 
-//! FBO wrapper.
-class OcctFboWrapper : public OpenGl_FrameBuffer
-{
-  DEFINE_STANDARD_RTTI_INLINE(OcctFboWrapper, OpenGl_FrameBuffer)
-public:
-  //! Empty constructor.
-  OcctFboWrapper() {}
-
-  //! Initialize FBO.
-  bool InitWrapperLazy (const Handle(OpenGl_Context)& theCtx, GLuint theFboId)
-  {
-    if (myGlFBufferId == theFboId)
-    {
-      return true;
-    }
-
-    return InitWrapper (theCtx);
-  }
-};
-
 // ================================================================
 // Function : OcctGtkViewer
 // Purpose  :
 // ================================================================
 OcctGtkViewer::OcctGtkViewer()
 : myVBox (Gtk::Orientation::ORIENTATION_VERTICAL),
-  myQuitButton ("Quit"),
-  myRotAngle (0.0f)
+  myQuitButton ("Quit")
 {
   Handle(Aspect_DisplayConnection) aDisp = new Aspect_DisplayConnection();
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver (aDisp, false);
+  // lets Gtk::GLArea to manage buffer swap
   aDriver->ChangeOptions().buffersNoSwap = true;
+  // don't write into alpha channel
   aDriver->ChangeOptions().buffersOpaqueAlpha = true;
+  // offscreen FBOs should be always used
   aDriver->ChangeOptions().useSystemBuffer = false;
 
   // create viewer
@@ -79,6 +61,7 @@ OcctGtkViewer::OcctGtkViewer()
   myViewCube->SetFixedAnimationLoop (false);
   myViewCube->SetAutoStartAnimation (true);
 
+  // note - window will be created later within onGlAreaRealized() callback!
   myView = myViewer->CreateView();
   myView->ChangeRenderingParams().ToShowStats = true;
   myView->ChangeRenderingParams().CollectedStats = (Graphic3d_RenderingParams::PerfCounters )
@@ -199,7 +182,8 @@ void OcctGtkViewer::dumpGlInfo (bool theIsBasic)
 // ================================================================
 void OcctGtkViewer::onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj)
 {
-  myRotAngle = theAdj->get_value();
+  float aVal = theAdj->get_value() / 360.0f;
+  myView->SetBackgroundColor (Quantity_Color (aVal, aVal, aVal, Quantity_TOC_sRGB));
   myGLArea.queue_draw();
 }
 
@@ -403,33 +387,33 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
   {
     myGLArea.throw_if_error();
 
-    // wrap FBO created by Qt
+    Graphic3d_Vec2i aViewSizeOld;
+    Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
+    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
+    aWindow->Size (aViewSizeOld.x(), aViewSizeOld.y());
+    if (aViewSizeNew != aViewSizeOld)
+    {
+      aWindow->SetSize (aViewSizeNew.x(), aViewSizeNew.y());
+      myView->MustBeResized();
+    }
+
+    // wrap FBO created by Gtk::GLArea
     Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
     const Handle(OpenGl_Context)& aGlCtx = aDriver->GetSharedContext();
-    Handle(OcctFboWrapper) aDefaultFbo = Handle(OcctFboWrapper)::DownCast (aGlCtx->DefaultFrameBuffer());
+    Handle(OpenGl_FrameBuffer) aDefaultFbo = aGlCtx->DefaultFrameBuffer();
     if (aDefaultFbo.IsNull())
     {
-      aDefaultFbo = new OcctFboWrapper();
+      aDefaultFbo = new OpenGl_FrameBuffer();
       aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
     }
-    //if (myToResize)
-    {
-      //aDefaultFbo->Release (aGlCtx.get());
-    }
+
     if (!aDefaultFbo->InitWrapper (aGlCtx))
-    ///if (!aDefaultFbo->InitWrapperLazy (aGlCtx, defaultFramebufferObject()))
     {
       aDefaultFbo.Nullify();
       Message::DefaultMessenger()->Send ("Default FBO wrapper creation failed\n", Message_Fail);
     }
 
-    //if (myToResize)
-    {
-      //myToResize = false;
-      //myView->MustBeResized();
-    }
-
-    float aVal = myRotAngle / 360.0f;
+    // flush pending input events and redraw the viewer
     FlushViewEvents (myContext, myView, true);
     return true;
   }
@@ -438,5 +422,20 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     Message::SendFail() << "An error occurred in the render callback of the GLArea\n"
                         << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
     return false;
+  }
+}
+
+// ================================================================
+// Function : handleViewRedraw
+// Purpose  :
+// ================================================================
+void OcctGtkViewer::handleViewRedraw (const Handle(AIS_InteractiveContext)& theCtx,
+                                      const Handle(V3d_View)& theView)
+{
+  AIS_ViewController::handleViewRedraw (theCtx, theView);
+  if (myToAskNextFrame)
+  {
+    // ask more frames
+    myGLArea.queue_draw();
   }
 }

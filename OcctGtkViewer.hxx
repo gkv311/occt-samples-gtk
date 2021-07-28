@@ -80,6 +80,10 @@ protected:
   //! Print OpenGL context info.
   void dumpGlInfo (bool theIsBasic);
 
+  //! Handle view redraw.
+  virtual void handleViewRedraw (const Handle(AIS_InteractiveContext)& theCtx,
+                                 const Handle(V3d_View)& theView) override;
+
 protected:
 
   Handle(V3d_Viewer)               myViewer;
@@ -91,7 +95,6 @@ protected:
   Gtk::GLArea myGLArea;
   Gtk::Box    myControls;
   Gtk::Button myQuitButton;
-  float       myRotAngle;
 
 };
 
