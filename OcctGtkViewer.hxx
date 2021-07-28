@@ -49,6 +49,20 @@ public:
 
 protected:
 
+  //! Handle mouse movement event.
+  bool onMouseMotion (GdkEventMotion* theEvent);
+
+  //! Handle mouse button press event.
+  bool onMouseButtonPressed (GdkEventButton* theEvent);
+
+  //! Handle mouse button released event.
+  bool onMouseButtonReleased (GdkEventButton* theEvent);
+
+  //! Handle mouse scroll event.
+  bool onMouseScroll (GdkEventScroll* theEvent);
+
+protected:
+
   //! Allocate OpenGL resources.
   void onGlAreaRealized();
 

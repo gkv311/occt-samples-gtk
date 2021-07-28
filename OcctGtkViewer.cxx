@@ -67,9 +67,9 @@ OcctGtkViewer::OcctGtkViewer()
   // create viewer
   myViewer = new V3d_Viewer (aDriver);
   myViewer->SetDefaultBackgroundColor (Quantity_NOC_BLACK);
-  //myViewer->SetDefaultBackgroundColor (Quantity_NOC_RED);
   myViewer->SetDefaultLights();
   myViewer->SetLightOn();
+  myViewer->ActivateGrid (Aspect_GT_Rectangular, Aspect_GDM_Lines);
 
   // create AIS context
   myContext = new AIS_InteractiveContext (myViewer);
@@ -80,7 +80,6 @@ OcctGtkViewer::OcctGtkViewer()
   myViewCube->SetAutoStartAnimation (true);
 
   myView = myViewer->CreateView();
-  myView->SetImmediateUpdate (false);
   myView->ChangeRenderingParams().ToShowStats = true;
   myView->ChangeRenderingParams().CollectedStats = (Graphic3d_RenderingParams::PerfCounters )
     (Graphic3d_RenderingParams::PerfCounters_FrameRate
@@ -98,13 +97,22 @@ OcctGtkViewer::OcctGtkViewer()
   myGLArea.set_size_request (100, 200);
   myVBox.add (myGLArea);
 
-  // Connect gl area signals
+  // connect to Gtk::GLArea events
   myGLArea.signal_realize()  .connect (sigc::mem_fun (*this, &OcctGtkViewer::onGlAreaRealized));
-  // Important that the unrealize signal calls our handler to clean up
+  // important that the unrealize signal calls our handler to clean up
   // GL resources _before_ the default unrealize handler is called (the "false")
   myGLArea.signal_unrealize().connect (sigc::mem_fun (*this, &OcctGtkViewer::onGlAreaReleased), false);
   myGLArea.signal_render()   .connect (sigc::mem_fun (*this, &OcctGtkViewer::onGlAreaRender), false);
 
+  // connect to mouse input events
+  myGLArea.add_events (Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK
+                     | Gdk::SMOOTH_SCROLL_MASK  | Gdk::FOCUS_CHANGE_MASK);
+  myGLArea.signal_motion_notify_event() .connect (sigc::mem_fun (*this, &OcctGtkViewer::onMouseMotion), false);
+  myGLArea.signal_button_press_event()  .connect (sigc::mem_fun (*this, &OcctGtkViewer::onMouseButtonPressed), false);
+  myGLArea.signal_button_release_event().connect (sigc::mem_fun (*this, &OcctGtkViewer::onMouseButtonReleased), false);
+  myGLArea.signal_scroll_event()        .connect (sigc::mem_fun (*this, &OcctGtkViewer::onMouseScroll), false);
+
+  // add dummy controls
   myVBox.add (myControls);
   myControls.set_hexpand (true);
 
@@ -195,6 +203,118 @@ void OcctGtkViewer::onValueChanged (const Glib::RefPtr<Gtk::Adjustment>& theAdj)
   myGLArea.queue_draw();
 }
 
+//! Convert Gtk event mouse button to Aspect_VKeyMouse.
+static Aspect_VKeyMouse mouseButtonFromGtk (guint theButton)
+{
+  switch (theButton)
+  {
+    case 1: return Aspect_VKeyMouse_LeftButton;
+    case 2: return Aspect_VKeyMouse_MiddleButton;
+    case 3: return Aspect_VKeyMouse_RightButton;
+  }
+  return Aspect_VKeyMouse_NONE;
+}
+
+//! Convert Gtk event mouse flags to Aspect_VKeyFlags.
+static Aspect_VKeyFlags mouseFlagsFromGtk (guint theFlags)
+{
+  Aspect_VKeyFlags aFlags = Aspect_VKeyFlags_NONE;
+  if ((theFlags & GDK_SHIFT_MASK) != 0)
+  {
+    aFlags |= Aspect_VKeyFlags_SHIFT;
+  }
+  if ((theFlags & GDK_CONTROL_MASK) != 0)
+  {
+    aFlags |= Aspect_VKeyFlags_CTRL;
+  }
+  if ((theFlags & GDK_META_MASK) != 0)
+  {
+    aFlags |= Aspect_VKeyFlags_META;
+  }
+  if ((theFlags & GDK_MOD1_MASK) != 0)
+  {
+    aFlags |= Aspect_VKeyFlags_ALT;
+  }
+  return aFlags;
+}
+
+// ================================================================
+// Function : onMouseMotion
+// Purpose  :
+// ================================================================
+bool OcctGtkViewer::onMouseMotion (GdkEventMotion* theEvent)
+{
+  const bool isEmulated = false;
+  const Aspect_VKeyMouse aButtons = PressedMouseButtons();
+  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
+  const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
+  if (UpdateMousePosition (aNewPos2i, aButtons, aFlags, isEmulated))
+  {
+    myGLArea.queue_draw();
+  }
+  return true;
+}
+
+// ================================================================
+// Function : onMouseButtonPressed
+// Purpose  :
+// ================================================================
+bool OcctGtkViewer::onMouseButtonPressed (GdkEventButton* theEvent)
+{
+  const bool isEmulated = false;
+  const Aspect_VKeyMouse aButton = mouseButtonFromGtk (theEvent->button);
+  if (aButton == Aspect_VKeyMouse_NONE)
+  {
+    return false;
+  }
+  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
+  const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
+  if (PressMouseButton (aNewPos2i, aButton, aFlags, isEmulated))
+  {
+    myGLArea.queue_draw();
+  }
+  return true;
+}
+
+// ================================================================
+// Function : onMouseButtonReleased
+// Purpose  :
+// ================================================================
+bool OcctGtkViewer::onMouseButtonReleased (GdkEventButton* theEvent)
+{
+  const bool isEmulated = false;
+  const Aspect_VKeyMouse aButton = mouseButtonFromGtk (theEvent->button);
+  if (aButton == Aspect_VKeyMouse_NONE)
+  {
+    return false;
+  }
+  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
+  const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
+  if (ReleaseMouseButton (aNewPos2i, aButton, aFlags, isEmulated))
+  {
+    myGLArea.queue_draw();
+  }
+  return true;
+}
+
+// ================================================================
+// Function : onMouseScroll
+// Purpose  :
+// ================================================================
+bool OcctGtkViewer::onMouseScroll (GdkEventScroll* theEvent)
+{
+  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Aspect_ScrollDelta aScroll (Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5)), -theEvent->delta_y);
+  if (UpdateMouseScroll (aScroll))
+  {
+    myGLArea.queue_draw();
+  }
+  return true;
+}
+
 // ================================================================
 // Function : onGlAreaRealized
 // Purpose  :
@@ -225,26 +345,15 @@ void OcctGtkViewer::onGlAreaRealized()
     }
     else
     {
-      myViewer->Driver()->GetDisplayConnection()->Init ((Aspect_XDisplay* )aGlCtx->GetDisplay());
+      // XDisplay could be wrapped, but OCCT may use a dedicated connection
+      //myViewer->Driver()->GetDisplayConnection()->Init ((Aspect_XDisplay* )aGlCtx->GetDisplay());
 
-//::Window www = gdk_x11_drawable_get_xid (gobj());
-//::Window www = gdk_x11_window_get_xid (gobj());
-//::Window www = gdk_x11_window_get_xid (gtk_widget_get_window (myGLArea.gobj()));
-::Window www = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
-//::Window www = aGlCtx->Window();
-
+      // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
+      //::Window anXWin = aGlCtx->Window();
+      ::Window anXWin = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
       aWindow = new Aspect_NeutralWindow();
-      aWindow->SetNativeHandle (www);
+      aWindow->SetNativeHandle (anXWin);
       aWindow->SetSize (aViewSize.x(), aViewSize.y());
-
-
-
-Message::SendWarning() << "Window: " << aGlCtx->Window() << "; www: " << www << "; Ctx: " << aGlCtx->RenderingContext() << "; Size: " << aViewSize.x() << "x" << aViewSize.y()
-                       << "; XServerVendor= " << XServerVendor ((Display* )aGlCtx->GetDisplay());
-//XWindowAttributes aWinAttribs;
-//XGetWindowAttributes ((Display* )aGlCtx->GetDisplay(), (::Window )aGlCtx->Window(), &aWinAttribs);
-//XGetWindowAttributes ((Display* )aGlCtx->GetDisplay(), www, &aWinAttribs);
-
       myView->SetWindow (aWindow, aGlCtx->RenderingContext());
       dumpGlInfo (false);
 
@@ -270,7 +379,7 @@ Message::SendWarning() << "Window: " << aGlCtx->Window() << "; www: " << www << 
 void OcctGtkViewer::onGlAreaReleased()
 {
   myGLArea.make_current();
-  /// TODO
+  /// TODO gracefully release OCCT viewer on application close
   /// myView.Nullify();
   try
   {
@@ -321,10 +430,7 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     }
 
     float aVal = myRotAngle / 360.0f;
-    //myGlCtx->core11fwd->glClearColor (aVal, aVal, aVal, 1.0);
-    //myGlCtx->core11fwd->glClear (GL_COLOR_BUFFER_BIT);
-    //myGlCtx->core11fwd->glFlush();
-    myView->Redraw();
+    FlushViewEvents (myContext, myView, true);
     return true;
   }
   catch (const Gdk::GLError& theGlErr)
