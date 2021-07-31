@@ -31,6 +31,28 @@
 
 #include <EGL/egl.h>
 
+//! Extension to frame buffer class to allow wrapping textured FBO.
+class OcctGtkFrameBuffer : public OpenGl_FrameBuffer
+{
+  DEFINE_STANDARD_RTTI_INLINE(OcctGtkFrameBuffer, OpenGl_FrameBuffer)
+public:
+
+  //! Wrap currently bound FBO.
+  bool InitWrapper (const Handle(OpenGl_Context)& theCtx,
+                    const Graphic3d_Vec2i& theSize)
+  {
+    GLint anFbo = GLint(NO_FRAMEBUFFER);
+    theCtx->core11fwd->glGetIntegerv (GL_FRAMEBUFFER_BINDING, &anFbo);
+    if (myGlFBufferId != anFbo)
+    {
+      OpenGl_FrameBuffer::InitWrapper (theCtx);
+    }
+    myVPSizeX = theSize.x();
+    myVPSizeY = theSize.y();
+    return myGlFBufferId != NO_FRAMEBUFFER;
+  }
+};
+
 // ================================================================
 // Function : OcctGtkViewer
 // Purpose  :
@@ -408,15 +430,16 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     myGLArea.throw_if_error();
 
     // wrap FBO created by Gtk::GLArea
+    const Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
     Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
     const Handle(OpenGl_Context)& aGlCtx = aDriver->GetSharedContext();
-    Handle(OpenGl_FrameBuffer) aDefaultFbo = aGlCtx->DefaultFrameBuffer();
+    Handle(OcctGtkFrameBuffer) aDefaultFbo = Handle(OcctGtkFrameBuffer)::DownCast (aGlCtx->DefaultFrameBuffer());
     if (aDefaultFbo.IsNull())
     {
-      aDefaultFbo = new OpenGl_FrameBuffer();
+      aDefaultFbo = new OcctGtkFrameBuffer();
       aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
     }
-    if (!aDefaultFbo->InitWrapper (aGlCtx))
+    if (!aDefaultFbo->InitWrapper (aGlCtx, aViewSizeNew))
     {
       aDefaultFbo.Nullify();
       Message::DefaultMessenger()->Send ("Default FBO wrapper creation failed\n", Message_Fail);
@@ -424,7 +447,6 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     }
 
     Graphic3d_Vec2i aViewSizeOld;
-    Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
     Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
     aWindow->Size (aViewSizeOld.x(), aViewSizeOld.y());
     if (aViewSizeNew != aViewSizeOld)
