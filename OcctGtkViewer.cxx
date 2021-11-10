@@ -100,6 +100,9 @@ OcctGtkViewer::OcctGtkViewer()
   myVBox.set_spacing (6);
   add (myVBox);
 
+#ifdef HAVE_GLES2
+  myGLArea.set_use_es (true);
+#endif
   myGLArea.set_hexpand (true);
   myGLArea.set_vexpand (true);
   myGLArea.set_size_request (100, 200);
@@ -334,14 +337,24 @@ void OcctGtkViewer::onGlAreaRealized()
   myGLArea.make_current();
   Graphic3d_Vec2i aViewSize (myGLArea.get_width(), myGLArea.get_height());
 
-  void* aEglCtx = eglGetCurrentContext();
-  if (aEglCtx != EGL_NO_CONTEXT)
+  EGLContext anEglCtx = eglGetCurrentContext();
+#ifdef HAVE_GLES2
+  if (anEglCtx == EGL_NO_CONTEXT)
+  {
+    Message::SendFail() << "Error: EGL context is not found";
+    Gtk::MessageDialog aMsg ("Error: EGL context is not found", false, Gtk::MESSAGE_ERROR);
+    aMsg.run();
+    return;
+  }
+#else
+  if (anEglCtx != EGL_NO_CONTEXT)
   {
     Message::SendFail() << "Error: Wayland session (EGL context) is not unsuppored";
     Gtk::MessageDialog aMsg ("Error: Wayland session (EGL context) is not unsuppored", false, Gtk::MESSAGE_ERROR);
     aMsg.run();
     return;
   }
+#endif
 
   Handle(OpenGl_Context) aGlCtx = new OpenGl_Context();
   if (!aGlCtx->Init (true))
@@ -358,26 +371,47 @@ void OcctGtkViewer::onGlAreaRealized()
     myGLArea.throw_if_error();
 
     Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
-    if (!aWindow.IsNull())
+    const bool isFirstInit = aWindow.IsNull();
+    if (isFirstInit)
     {
-      aWindow->SetSize (aViewSize.x(), aViewSize.y());
-      myView->SetWindow (aWindow, aGlCtx->RenderingContext());
-      dumpGlInfo (true);
-    }
-    else
-    {
-      // XDisplay could be wrapped, but OCCT may use a dedicated connection
-      //myViewer->Driver()->GetDisplayConnection()->Init ((Aspect_XDisplay* )aGlCtx->GetDisplay());
-
-      // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
-      //::Window anXWin = aGlCtx->Window();
-      ::Window anXWin = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
       aWindow = new Aspect_NeutralWindow();
-      aWindow->SetNativeHandle (anXWin);
-      aWindow->SetSize (aViewSize.x(), aViewSize.y());
-      myView->SetWindow (aWindow, aGlCtx->RenderingContext());
-      dumpGlInfo (false);
+      if (anEglCtx != EGL_NO_CONTEXT)
+      {
+        // wrap EGL surface
+        EGLContext anEglDisplay = eglGetCurrentDisplay();
+        EGLContext anEglSurf    = eglGetCurrentSurface (EGL_DRAW);
+        EGLint anEglCfgId = 0, aNbConfigs = 0;
+        eglQuerySurface (anEglDisplay, anEglSurf, EGL_CONFIG_ID, &anEglCfgId);
+        const EGLint aConfigAttribs[] = { EGL_CONFIG_ID, anEglCfgId, EGL_NONE };
+        void* anEglCfg = NULL;
+        eglChooseConfig (anEglDisplay, aConfigAttribs, &anEglCfg, 1, &aNbConfigs);
 
+        Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
+        if (!aDriver->InitEglContext (anEglDisplay, anEglCtx, anEglCfg))
+        {
+          Message::SendFail() << "Error: OpenGl_GraphicDriver cannot initialize EGL context";
+          Gtk::MessageDialog aMsg ("Error: OpenGl_GraphicDriver cannot initialize EGL context", false, Gtk::MESSAGE_ERROR);
+          aMsg.run();
+          return;
+        }
+      }
+      else
+      {
+        // XDisplay could be wrapped, but OCCT may use a dedicated connection
+        //myViewer->Driver()->GetDisplayConnection()->Init ((Aspect_XDisplay* )aGlCtx->GetDisplay());
+
+        // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
+        //::Window anXWin = aGlCtx->Window();
+        ::Window anXWin = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
+        aWindow->SetNativeHandle (anXWin);
+      }
+    }
+
+    aWindow->SetSize (aViewSize.x(), aViewSize.y());
+    myView->SetWindow (aWindow, aGlCtx->RenderingContext());
+    dumpGlInfo (!isFirstInit);
+    if (isFirstInit)
+    {
       myContext->Display (myViewCube, 0, 0, false);
     }
   }
@@ -457,6 +491,7 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     }
 
     // flush pending input events and redraw the viewer
+    myView->InvalidateImmediate();
     FlushViewEvents (myContext, myView, true);
     return true;
   }

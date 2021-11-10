@@ -9,7 +9,14 @@ set (APP_VERSION_MINOR 0)
 set (APP_TARGET occt-gtkmm-sample)
 set (CMAKE_CXX_STANDARD 11)
 
-find_package (OpenGL    REQUIRED)
+set (USE_GLES2 OFF CACHE BOOL "Use OpenGL ES instead of desktop OpenGL")
+if (USE_GLES2)
+  add_definitions (-DHAVE_GLES2)
+  #find_package (OpenGLES2 REQUIRED)
+else()
+  find_package (OpenGL REQUIRED)
+endif()
+
 find_package (PkgConfig REQUIRED)
 pkg_check_modules (GTKMM REQUIRED gtkmm-3.0)
 
@@ -45,10 +52,17 @@ include_directories(${GTKMM_INCLUDE_DIRS})
 link_directories   (${GTKMM_LIBRARY_DIRS})
 
 # define dependencies
-set (anOcctLibs TKOpenGl TKXDEIGES TKIGES TKXDESTEP TKSTEP TKSTEPAttr TKSTEP209 TKSTEPBase TKXSBase TKBinXCAF TKXmlXCAF TKBin TKXml TKXmlL TKBinL TKXCAF TKVCAF TKCAF TKV3d TKMesh TKOffset TKFillet TKShHealing TKBool TKBO TKHLR TKPrim TKService TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKLCAF TKCDF TKernel)
+set (anOcctLibs TKXDEIGES TKIGES TKXDESTEP TKSTEP TKSTEPAttr TKSTEP209 TKSTEPBase TKXSBase TKBinXCAF TKXmlXCAF TKBin TKXml TKXmlL TKBinL TKXCAF TKVCAF TKCAF TKV3d TKMesh TKOffset TKFillet TKShHealing TKBool TKBO TKHLR TKPrim TKService TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKLCAF TKCDF TKernel)
 target_link_libraries (${PROJECT_NAME} PRIVATE ${anOcctLibs})
+if (USE_GLES2)
+  target_link_libraries (${PROJECT_NAME} PRIVATE TKOpenGles)
+  target_link_libraries (${PROJECT_NAME} PRIVATE GLESv2)
+else()
+  target_link_libraries (${PROJECT_NAME} PRIVATE TKOpenGl)
+  target_link_libraries (${PROJECT_NAME} PRIVATE ${OPENGL_LIBRARIES})
+endif()
 
-target_link_libraries (${PROJECT_NAME} PRIVATE ${GTKMM_LIBRARIES} ${OPENGL_LIBRARIES})
+target_link_libraries (${PROJECT_NAME} PRIVATE ${GTKMM_LIBRARIES})
 
 if (UNIX)
   target_link_libraries (${PROJECT_NAME} PRIVATE EGL)
