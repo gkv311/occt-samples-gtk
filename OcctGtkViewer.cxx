@@ -21,6 +21,8 @@
 
 #include "OcctGtkViewer.hxx"
 
+#include <AIS_Shape.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
 #include <Message.hxx>
 #include <OpenGl_Context.hxx>
 #include <OpenGl_GraphicDriver.hxx>
@@ -440,6 +442,13 @@ void OcctGtkViewer::onGlAreaRealized()
     if (isFirstInit)
     {
       myContext->Display (myViewCube, 0, 0, false);
+
+      {
+        // dummy shape for testing
+        TopoDS_Shape aBox = BRepPrimAPI_MakeBox (100.0, 50.0, 90.0).Shape();
+        Handle(AIS_Shape) aShape = new AIS_Shape (aBox);
+        myContext->Display (aShape, AIS_Shaded, 0, false);
+      }
     }
   }
   catch (const Gdk::GLError& theGlErr)
