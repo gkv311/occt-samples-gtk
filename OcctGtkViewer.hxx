@@ -80,6 +80,9 @@ protected:
   //! Print OpenGL context info.
   void dumpGlInfo (bool theIsBasic);
 
+  //! Initialize pixel scale ratio.
+  void initPixelScaleRatio();
+
   //! Handle view redraw.
   virtual void handleViewRedraw (const Handle(AIS_InteractiveContext)& theCtx,
                                  const Handle(V3d_View)& theView) override;
@@ -90,6 +93,7 @@ protected:
   Handle(V3d_View)                 myView;
   Handle(AIS_InteractiveContext)   myContext;
   Handle(AIS_ViewCube)             myViewCube;  //!< view cube object
+  float                            myDevicePixelRatio = 1.0f; //!< device pixel ratio for handling high DPI displays
 
   Gtk::Box    myVBox;
   Gtk::GLArea myGLArea;

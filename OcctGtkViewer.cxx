@@ -31,26 +31,21 @@
 
 #include <EGL/egl.h>
 
-//! Extension to frame buffer class to allow wrapping textured FBO.
-class OcctGtkFrameBuffer : public OpenGl_FrameBuffer
+//! Native window wrapper.
+class OcctGtkWindow : public Aspect_NeutralWindow
 {
-  DEFINE_STANDARD_RTTI_INLINE(OcctGtkFrameBuffer, OpenGl_FrameBuffer)
 public:
+  //! Constructor.
+  OcctGtkWindow() {}
 
-  //! Wrap currently bound FBO.
-  bool InitWrapper (const Handle(OpenGl_Context)& theCtx,
-                    const Graphic3d_Vec2i& theSize)
-  {
-    GLint anFbo = GLint(NO_FRAMEBUFFER);
-    theCtx->core11fwd->glGetIntegerv (GL_FRAMEBUFFER_BINDING, &anFbo);
-    if (myGlFBufferId != anFbo)
-    {
-      OpenGl_FrameBuffer::InitWrapper (theCtx);
-    }
-    myVPSizeX = theSize.x();
-    myVPSizeY = theSize.y();
-    return myGlFBufferId != NO_FRAMEBUFFER;
-  }
+  //! Return device pixel ratio (logical to backing store scale factor).
+  virtual Standard_Real DevicePixelRatio() const override { return myPixelRatio; }
+
+  //! Set pixel ratio.
+  void SetDevicePixelRatio (Standard_Real theRatio) { myPixelRatio = theRatio; }
+
+private:
+  double myPixelRatio = 1.0;
 };
 
 // ================================================================
@@ -175,6 +170,7 @@ void OcctGtkViewer::dumpGlInfo (bool theIsBasic)
     aGlCapsDict.Clear();
     aGlCapsDict.Add ("Viewport", aViewport);
   }
+  aGlCapsDict.Add ("Display scale", TCollection_AsciiString(myDevicePixelRatio));
 
   // beautify output
   {
@@ -259,7 +255,7 @@ bool OcctGtkViewer::onMouseMotion (GdkEventMotion* theEvent)
 {
   const bool isEmulated = false;
   const Aspect_VKeyMouse aButtons = PressedMouseButtons();
-  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2d aNewPos2d = myView->Window()->ConvertPointToBacking (Graphic3d_Vec2d (theEvent->x, theEvent->y));
   const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
   const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
   if (UpdateMousePosition (aNewPos2i, aButtons, aFlags, isEmulated))
@@ -281,7 +277,7 @@ bool OcctGtkViewer::onMouseButtonPressed (GdkEventButton* theEvent)
   {
     return false;
   }
-  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2d aNewPos2d = myView->Window()->ConvertPointToBacking (Graphic3d_Vec2d (theEvent->x, theEvent->y));
   const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
   const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
   if (PressMouseButton (aNewPos2i, aButton, aFlags, isEmulated))
@@ -303,7 +299,7 @@ bool OcctGtkViewer::onMouseButtonReleased (GdkEventButton* theEvent)
   {
     return false;
   }
-  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2d aNewPos2d = myView->Window()->ConvertPointToBacking (Graphic3d_Vec2d (theEvent->x, theEvent->y));
   const Graphic3d_Vec2i aNewPos2i = Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5));
   const Aspect_VKeyFlags aFlags = mouseFlagsFromGtk (theEvent->state);
   if (ReleaseMouseButton (aNewPos2i, aButton, aFlags, isEmulated))
@@ -319,7 +315,7 @@ bool OcctGtkViewer::onMouseButtonReleased (GdkEventButton* theEvent)
 // ================================================================
 bool OcctGtkViewer::onMouseScroll (GdkEventScroll* theEvent)
 {
-  const Graphic3d_Vec2d aNewPos2d (theEvent->x, theEvent->y);
+  const Graphic3d_Vec2d aNewPos2d = myView->Window()->ConvertPointToBacking (Graphic3d_Vec2d (theEvent->x, theEvent->y));
   const Aspect_ScrollDelta aScroll (Graphic3d_Vec2i (aNewPos2d + Graphic3d_Vec2d (0.5)), -theEvent->delta_y);
   if (UpdateMouseScroll (aScroll))
   {
@@ -329,13 +325,34 @@ bool OcctGtkViewer::onMouseScroll (GdkEventScroll* theEvent)
 }
 
 // ================================================================
+// Function : initPixelScaleRatio
+// Purpose  :
+// ================================================================
+void OcctGtkViewer::initPixelScaleRatio()
+{
+  SetTouchToleranceScale (myDevicePixelRatio);
+  myView->ChangeRenderingParams().Resolution = (unsigned int )(96.0 * myDevicePixelRatio + 0.5);
+  myContext->SetPixelTolerance (int(myDevicePixelRatio * 6.0));
+
+  static const double THE_CUBE_SIZE = 60.0;
+  myViewCube->SetSize (myDevicePixelRatio * THE_CUBE_SIZE, false);
+  myViewCube->SetBoxFacetExtension (myViewCube->Size() * 0.15);
+  myViewCube->SetAxesPadding (myViewCube->Size() * 0.10);
+  myViewCube->SetFontHeight  (THE_CUBE_SIZE * 0.16);
+  if (myViewCube->HasInteractiveContext())
+  {
+    myContext->Redisplay (myViewCube, false);
+  }
+}
+
+// ================================================================
 // Function : onGlAreaRealized
 // Purpose  :
 // ================================================================
 void OcctGtkViewer::onGlAreaRealized()
 {
   myGLArea.make_current();
-  Graphic3d_Vec2i aViewSize (myGLArea.get_width(), myGLArea.get_height());
+  Graphic3d_Vec2i aLogicalSize (myGLArea.get_width(), myGLArea.get_height());
 
   EGLContext anEglCtx = eglGetCurrentContext();
 #ifdef HAVE_GLES2
@@ -370,11 +387,16 @@ void OcctGtkViewer::onGlAreaRealized()
     OCC_CATCH_SIGNALS
     myGLArea.throw_if_error();
 
-    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
+    // FBO is not yet initialized?
+    //Handle(OpenGl_FrameBuffer) aDefaultFbo = new OpenGl_FrameBuffer();
+    //const Graphic3d_Vec2i aViewSize = aDefaultFbo->InitWrapper (aGlCtx) ? aDefaultFbo->GetVPSize() : aLogicalSize;
+    const Graphic3d_Vec2i aViewSize = aLogicalSize * myGLArea.get_scale_factor();
+
+    Handle(OcctGtkWindow) aWindow = Handle(OcctGtkWindow)::DownCast (myView->Window());
     const bool isFirstInit = aWindow.IsNull();
     if (isFirstInit)
     {
-      aWindow = new Aspect_NeutralWindow();
+      aWindow = new OcctGtkWindow();
       if (anEglCtx != EGL_NO_CONTEXT)
       {
         // wrap EGL surface
@@ -407,7 +429,12 @@ void OcctGtkViewer::onGlAreaRealized()
       }
     }
 
+    const float aPixelRatio = float(aViewSize.y()) / float(aLogicalSize.y());
     aWindow->SetSize (aViewSize.x(), aViewSize.y());
+    aWindow->SetDevicePixelRatio (aPixelRatio);
+    myDevicePixelRatio = aPixelRatio;
+    initPixelScaleRatio();
+
     myView->SetWindow (aWindow, aGlCtx->RenderingContext());
     dumpGlInfo (!isFirstInit);
     if (isFirstInit)
@@ -464,16 +491,15 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     myGLArea.throw_if_error();
 
     // wrap FBO created by Gtk::GLArea
-    const Graphic3d_Vec2i aViewSizeNew (myGLArea.get_width(), myGLArea.get_height());
     Handle(OpenGl_GraphicDriver) aDriver = Handle(OpenGl_GraphicDriver)::DownCast (myContext->CurrentViewer()->Driver());
     const Handle(OpenGl_Context)& aGlCtx = aDriver->GetSharedContext();
-    Handle(OcctGtkFrameBuffer) aDefaultFbo = Handle(OcctGtkFrameBuffer)::DownCast (aGlCtx->DefaultFrameBuffer());
+    Handle(OpenGl_FrameBuffer) aDefaultFbo = aGlCtx->DefaultFrameBuffer();
     if (aDefaultFbo.IsNull())
     {
-      aDefaultFbo = new OcctGtkFrameBuffer();
+      aDefaultFbo = new OpenGl_FrameBuffer();
       aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
     }
-    if (!aDefaultFbo->InitWrapper (aGlCtx, aViewSizeNew))
+    if (!aDefaultFbo->InitWrapper (aGlCtx))
     {
       aDefaultFbo.Nullify();
       Message::DefaultMessenger()->Send ("Default FBO wrapper creation failed\n", Message_Fail);
@@ -481,13 +507,23 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     }
 
     Graphic3d_Vec2i aViewSizeOld;
-    Handle(Aspect_NeutralWindow) aWindow = Handle(Aspect_NeutralWindow)::DownCast (myView->Window());
+    const Graphic3d_Vec2i aLogicalSize (myGLArea.get_width(), myGLArea.get_height());
+    const Graphic3d_Vec2i aViewSizeNew = aDefaultFbo->GetVPSize();
+    const float aPixelRatio = float(aViewSizeNew.y()) / float(aLogicalSize.y());
+    Handle(OcctGtkWindow) aWindow = Handle(OcctGtkWindow)::DownCast (myView->Window());
     aWindow->Size (aViewSizeOld.x(), aViewSizeOld.y());
     if (aViewSizeNew != aViewSizeOld)
     {
       aWindow->SetSize (aViewSizeNew.x(), aViewSizeNew.y());
       myView->MustBeResized();
       myView->Invalidate();
+    }
+    if (myDevicePixelRatio != aPixelRatio)
+    {
+      myDevicePixelRatio = aPixelRatio;
+      aWindow->SetDevicePixelRatio (aPixelRatio);
+      initPixelScaleRatio();
+      dumpGlInfo (true);
     }
 
     // flush pending input events and redraw the viewer
