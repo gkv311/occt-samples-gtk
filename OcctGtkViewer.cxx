@@ -368,8 +368,8 @@ void OcctGtkViewer::onGlAreaRealized()
 #else
   if (anEglCtx != EGL_NO_CONTEXT)
   {
-    Message::SendFail() << "Error: Wayland session (EGL context) is not unsuppored";
-    Gtk::MessageDialog aMsg ("Error: Wayland session (EGL context) is not unsuppored", false, Gtk::MESSAGE_ERROR);
+    Message::SendFail() << "Error: Wayland session (EGL context) is not unsupported";
+    Gtk::MessageDialog aMsg ("Error: Wayland session (EGL context) is not unsupported", false, Gtk::MESSAGE_ERROR);
     aMsg.run();
     return;
   }
@@ -453,12 +453,12 @@ void OcctGtkViewer::onGlAreaRealized()
   }
   catch (const Gdk::GLError& theGlErr)
   {
-    Message::SendFail() << "An error occured making the context current during realize:\n"
+    Message::SendFail() << "An error occurred making the context current during realize:\n"
                         << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what();
   }
   catch (const Standard_Failure& theErr)
   {
-    Message::SendFail() << "An error occured making the context current during realize:\n"
+    Message::SendFail() << "An error occurred making the context current during realize:\n"
                         << theErr;
   }
 }
@@ -470,15 +470,28 @@ void OcctGtkViewer::onGlAreaRealized()
 void OcctGtkViewer::onGlAreaReleased()
 {
   myGLArea.make_current();
-  /// TODO gracefully release OCCT viewer on application close
-  /// myView.Nullify();
   try
   {
     myGLArea.throw_if_error();
+
+    // release OCCT viewer on application close
+    Handle(Aspect_DisplayConnection) aDisp;
+    if (!myContext.IsNull())
+    {
+      aDisp = myViewer->Driver()->GetDisplayConnection();
+      myContext->RemoveAll (false);
+      myContext.Nullify();
+      myView->Remove();
+      myView.Nullify();
+      myViewer.Nullify();
+    }
+
+    myGLArea.make_current();
+    aDisp.Nullify();
   }
   catch (const Gdk::GLError& theGlErr)
   {
-    Message::SendFail() << "An error occured making the context current during unrealize\n"
+    Message::SendFail() << "An error occurred making the context current during unrealize\n"
                         << theGlErr.domain() << "-" << theGlErr.code() << "-" << theGlErr.what() << "\n";
   }
 }
