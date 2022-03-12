@@ -50,6 +50,38 @@ private:
   double myPixelRatio = 1.0;
 };
 
+//! OpenGL FBO subclass for wrapping FBO created by GTK using GL_RGBA8 texture format instead of GL_SRGB8_ALPHA8.
+//! This FBO is set to OpenGl_Context::SetDefaultFrameBuffer() as a final target.
+//! Subclass calls OpenGl_Context::SetFrameBufferSRGB() with sRGB=false flag,
+//! which asks OCCT to disable GL_FRAMEBUFFER_SRGB and apply sRGB gamma correction manually.
+class OcctQtFrameBuffer : public OpenGl_FrameBuffer
+{
+  DEFINE_STANDARD_RTTI_INLINE(OcctQtFrameBuffer, OpenGl_FrameBuffer)
+public:
+  //! Empty constructor.
+  OcctQtFrameBuffer() {}
+
+  //! Make this FBO active in context.
+  virtual void BindBuffer (const Handle(OpenGl_Context)& theGlCtx) override
+  {
+    OpenGl_FrameBuffer::BindBuffer (theGlCtx);
+    theGlCtx->SetFrameBufferSRGB (true, false);
+  }
+
+  //! Make this FBO as drawing target in context.
+  virtual void BindDrawBuffer (const Handle(OpenGl_Context)& theGlCtx) override
+  {
+    OpenGl_FrameBuffer::BindDrawBuffer (theGlCtx);
+    theGlCtx->SetFrameBufferSRGB (true, false);
+  }
+
+  //! Make this FBO as reading source in context.
+  virtual void BindReadBuffer (const Handle(OpenGl_Context)& theGlCtx) override
+  {
+    OpenGl_FrameBuffer::BindReadBuffer (theGlCtx);
+  }
+};
+
 // ================================================================
 // Function : OcctGtkViewer
 // Purpose  :
@@ -390,7 +422,7 @@ void OcctGtkViewer::onGlAreaRealized()
     myGLArea.throw_if_error();
 
     // FBO is not yet initialized?
-    //Handle(OpenGl_FrameBuffer) aDefaultFbo = new OpenGl_FrameBuffer();
+    //Handle(OpenGl_FrameBuffer) aDefaultFbo = new OcctQtFrameBuffer();
     //const Graphic3d_Vec2i aViewSize = aDefaultFbo->InitWrapper (aGlCtx) ? aDefaultFbo->GetVPSize() : aLogicalSize;
     const Graphic3d_Vec2i aViewSize = aLogicalSize * myGLArea.get_scale_factor();
 
@@ -518,7 +550,7 @@ bool OcctGtkViewer::onGlAreaRender (const Glib::RefPtr<Gdk::GLContext>& theGlCtx
     Handle(OpenGl_FrameBuffer) aDefaultFbo = aGlCtx->DefaultFrameBuffer();
     if (aDefaultFbo.IsNull())
     {
-      aDefaultFbo = new OpenGl_FrameBuffer();
+      aDefaultFbo = new OcctQtFrameBuffer();
       aGlCtx->SetDefaultFrameBuffer (aDefaultFbo);
     }
     if (!aDefaultFbo->InitWrapper (aGlCtx))
