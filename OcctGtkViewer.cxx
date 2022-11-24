@@ -458,7 +458,17 @@ void OcctGtkViewer::onGlAreaRealized()
 
         // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
         //::Window anXWin = aGlCtx->Window();
+    #ifdef _WIN32
+        Aspect_Drawable anXWin = (Aspect_Drawable )(GtkWidget* )myGLArea.gobj();
+        //HGLRC aWglCtx    = wglGetCurrentContext();
+        HDC   aWglDevCtx = wglGetCurrentDC();
+        HWND  aWglWin    = WindowFromDC (aWglDevCtx);
+        anXWin = (Aspect_Drawable )aWglWin;
+
+    #else
         ::Window anXWin = gdk_x11_window_get_xid (gtk_widget_get_window ((GtkWidget* )myGLArea.gobj()));
+        
+    #endif
         aWindow->SetNativeHandle (anXWin);
       }
     }
