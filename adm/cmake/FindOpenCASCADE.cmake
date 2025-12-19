@@ -3,10 +3,11 @@
 #  OpenCASCADE_DIR - root OCCT folder or folder with CMake configuration files
 #
 # Script will define the following variables on success:
-#  OpenCASCADE_FOUND       - package is successfully found
-#  OpenCASCADE_INCLUDE_DIR - directory with headers
-#  OpenCASCADE_LIBRARY_DIR - directory with libraries for linker
-#  OpenCASCADE_BINARY_DIR  - directory with DLLs
+#  OpenCASCADE_FOUND        - package is successfully found
+#  OpenCASCADE_INCLUDE_DIR  - directory with headers
+#  OpenCASCADE_LIBRARY_DIR  - directory with libraries for linker
+#  OpenCASCADE_BINARY_DIR   - directory with DLLs
+#  OpenCASCADE_RESOURCE_DIR - directory with resource files
 include(FindPackageHandleStandardArgs)
 
 # MY_PLATFORM variable
@@ -48,23 +49,25 @@ else()
   string (REGEX REPLACE " " "" COMPILER ${MY_COMPILER})
 endif()
 set (MY_PLATFORM_AND_COMPILER "${MY_PLATFORM}/${MY_COMPILER}")
+message (STATUS "MY_PLATFORM_AND_COMPILER=${MY_PLATFORM_AND_COMPILER}")
 
 set (OpenCASCADE_DIR "" CACHE PATH "Path to Open CASCADE libraries.")
 
 # default paths
-set (OpenCASCADE_INCLUDE_DIR "${OpenCASCADE_DIR}/inc")
-set (OpenCASCADE_LIBRARY_DIR "${OpenCASCADE_DIR}/${MY_PLATFORM_AND_COMPILER}/lib")
-set (OpenCASCADE_BINARY_DIR  "${OpenCASCADE_DIR}/${MY_PLATFORM_AND_COMPILER}/bin")
+set (OpenCASCADE_INCLUDE_DIR  "${OpenCASCADE_DIR}/inc")
+set (OpenCASCADE_LIBRARY_DIR  "${OpenCASCADE_DIR}/${MY_PLATFORM_AND_COMPILER}/lib")
+set (OpenCASCADE_BINARY_DIR   "${OpenCASCADE_DIR}/${MY_PLATFORM_AND_COMPILER}/bin")
+set (OpenCASCADE_RESOURCE_DIR "${OpenCASCADE_DIR}/src")
 
 # complete list of OCCT Toolkits (copy-paste from adm/UDLIST, since installed OCCT does not include UDLIST)
 set (OpenCASCADE_TKLIST "")
 set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKernel TKMath) # FoundationClasses
 set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKG2d TKG3d TKGeomBase TKBRep) # ModelingData
 set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKGeomAlgo TKTopAlgo TKPrim TKBO TKBool TKHLR TKFillet TKOffset TKFeat TKMesh TKXMesh TKShHealing) # ModelingAlgorithms
-set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKService TKV3d TKOpenGl TKOpenGles TKMeshVS TKIVtk TKD3DHost) # Visualization
+set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKService TKV3d TKOpenGl TKMeshVS TKIVtk TKD3DHost) # Visualization
 set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKCDF TKLCAF TKCAF TKBinL TKXmlL TKBin TKXml TKStdL TKStd TKTObj TKBinTObj TKXmlTObj TKVCAF) # ApplicationFramework
 set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKXSBase TKSTEPBase TKSTEPAttr TKSTEP209 TKSTEP TKIGES TKXCAF TKXDEIGES TKXDESTEP TKSTL TKVRML TKXmlXCAF TKBinXCAF TKRWMesh) # DataExchange
-set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKDraw TKViewerTest) # Draw
+set (OpenCASCADE_TKLIST ${OpenCASCADE_TKLIST} TKDraw TKViewerTest TKTopTest TKOpenGlTest) # Draw
 
 # validate location of OCCT libraries and headers
 set (OpenCASCADE_INCLUDE_DIR_FOUND)
@@ -119,7 +122,7 @@ if (OpenCASCADE_INCLUDE_DIR_FOUND AND OpenCASCADE_LIBRARY_DIR_FOUND)
   set (OpenCASCADE_INSTALL_PREFIX ${OpenCASCADE_DIR})
 
   # Define OCCT toolkits so that CMake can put absolute paths to linker;
-  # the library existance is not checked here, since modules can be disabled.
+  # the library existence is not checked here, since modules can be disabled.
   foreach (aLibIter ${OpenCASCADE_TKLIST})
     add_library (${aLibIter} SHARED IMPORTED)
 
