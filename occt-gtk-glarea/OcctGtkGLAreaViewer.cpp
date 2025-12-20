@@ -156,7 +156,7 @@ void OcctGtkGLAreaViewer::handleViewRedraw(const Handle(AIS_InteractiveContext)&
 // ================================================================
 void OcctGtkGLAreaViewer::initPixelScaleRatio()
 {
-  SetTouchToleranceScale(myDevicePixelRatio);
+  AIS_ViewController::SetTouchToleranceScale(myDevicePixelRatio);
   myView->ChangeRenderingParams().Resolution = (unsigned int )(96.0 * myDevicePixelRatio + 0.5);
 }
 
@@ -204,17 +204,17 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
     initPixelScaleRatio();
 
     const bool isFirstInit = myView->Window().IsNull();
-    Aspect_Drawable aDrawable = 0;
+    Aspect_Drawable aNativeWin = 0;
 #ifdef HAVE_GLES2
     //
 #elif defined(_WIN32)
     //
 #else
     // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
-    //aDrawable = aGlCtx->Window();
-    aDrawable = gdk_x11_window_get_xid(gtk_widget_get_window((GtkWidget* )gobj()));
+    //aNativeWin = aGlCtx->Window();
+    aNativeWin = gdk_x11_window_get_xid(gtk_widget_get_window((GtkWidget* )gobj()));
 #endif
-    if (!OcctGlTools::InitializeGlWindow(myView, aDrawable, aViewSize, myDevicePixelRatio))
+    if (!OcctGlTools::InitializeGlWindow(myView, aNativeWin, aViewSize, myDevicePixelRatio))
     {
       Gtk::MessageDialog aMsg("Error: OpenGl_Context is unable to wrap OpenGL context", false, Gtk::MESSAGE_ERROR);
       aMsg.run();
@@ -308,7 +308,7 @@ bool OcctGtkGLAreaViewer::onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& the
 
     // flush pending input events and redraw the viewer
     myView->InvalidateImmediate();
-    FlushViewEvents(myContext, myView, true);
+    AIS_ViewController::FlushViewEvents(myContext, myView, true);
     return true;
   }
   catch (const Gdk::GLError& theGlErr)
