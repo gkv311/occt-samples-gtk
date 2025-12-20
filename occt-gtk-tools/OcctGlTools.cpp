@@ -14,6 +14,10 @@
 
 #include <EGL/egl.h>
 
+#if !defined(HAVE_GLES2) && !defined(_WIN32)
+#include <GL/glx.h>
+#endif
+
 // Exporting this symbol from .exe with value=1 will direct to NVIDIA GPU on Optimus systems
 //__declspec(dllexport) DWORD NvOptimusEnablement = 1;
 // Exporting this symbol from .exe with value=1 will direct to faster GPU on AMD PowerXpress systems
@@ -67,10 +71,25 @@ Handle(OpenGl_Context) OcctGlTools::GetGlContext(const Handle(V3d_View)& theView
 Aspect_Drawable OcctGlTools::GetGlNativeWindow(Aspect_Drawable theNativeWin)
 {
   Aspect_Drawable aNativeWin = (Aspect_Drawable)theNativeWin;
-#ifdef _WIN32
+#ifdef HAVE_GLES2
+  //
+#elif defined(_WIN32)
   HDC  aWglDevCtx = wglGetCurrentDC();
   HWND aWglWin = WindowFromDC(aWglDevCtx);
   aNativeWin = (Aspect_Drawable)aWglWin;
+#else
+  Display*    aGlxDisp = glXGetCurrentDisplay();
+  GLXContext  aGlxCtx  = glXGetCurrentContext();
+  GLXDrawable aGlxDraw = glXGetCurrentDrawable();
+  if (aGlxDisp != nullptr && aGlxCtx != 0 && aGlxDraw != GLXDrawable(theNativeWin) && theNativeWin != 0)
+  {
+    // Gtk::GLArea creates GLXWindow from Window, but OCCT 3D Viewer expects Window
+    if (!glXMakeCurrent(aGlxDisp, (GLXDrawable )theNativeWin, aGlxCtx))
+    {
+      Message::SendFail() << "glXMakeCurrent() has failed with specified Window";
+      return theNativeWin;
+    }
+  }
 #endif
   return aNativeWin;
 }
