@@ -220,11 +220,13 @@ void OcctGlTools::ResetGlStateBeforeOcct(const Handle(V3d_View)& theView)
   // Disable also texture bindings left by Qt.
   aGlCtx->core11fwd->glBindTexture(GL_TEXTURE_2D, 0);
   aGlCtx->core11fwd->glDisable(GL_BLEND);
+#ifndef HAVE_GLES2
   if (aGlCtx->core11ffp != nullptr)
   {
     aGlCtx->core11fwd->glDisable(GL_ALPHA_TEST);
     aGlCtx->core11fwd->glDisable(GL_TEXTURE_2D);
   }
+#endif
 }
 
 // ================================================================

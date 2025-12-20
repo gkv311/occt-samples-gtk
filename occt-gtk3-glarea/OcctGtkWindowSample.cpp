@@ -15,7 +15,7 @@ OcctGtkWindowSample::OcctGtkWindowSample()
   myAboutButton("About"),
   myQuitButton("Quit")
 {
-  set_title("OCCT Gtk::GLArea Viewer sample");
+  set_title("OCCT Gtk3::GLArea Viewer sample");
   set_default_size(720, 480);
 
   myVBox.set_spacing(6);

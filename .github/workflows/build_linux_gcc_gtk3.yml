@@ -1,4 +1,4 @@
-name: Build (Linux/GCC/qtkmm3)
+name: Build (Linux/GCC/qtk3)
 on:
   push:
     branches: [ master ]
@@ -29,15 +29,15 @@ jobs:
     - name: Configure project
       run: |
         mkdir "build"
-        cmake -G Ninja -S . -B "./build" -D USE_GLES2=FALSE
+        cmake -G Ninja -S . -B "./build" -D USE_GLES2=FALSE -D GTK_VERSION=GTK3
     - name: Build project
       run: |
         cmake --build "./build" --config Release
     - name: Run tests
       run: |
-        xvfb-run --server-args="-screen 0 800x600x24" ./.github/workflows/screenshot.sh ./build/occt-gtk-glarea/occt-gtk-glarea ./build/occt-sample-gtkmm3.png 5
+        xvfb-run --server-args="-screen 0 800x600x24" ./.github/workflows/screenshot.sh ./build/occt-gtk3-glarea/occt-gtk3-glarea ./build/occt-sample-gtk3.png 5
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: occt-gtkmm-3
+        name: occt-gtk3
         path: ./build/*.png

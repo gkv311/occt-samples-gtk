@@ -1,13 +1,13 @@
 cmake_minimum_required (VERSION 3.13)
 
-project (occt-gtk-glarea)
+project (occt-gtk4-glarea)
 
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../adm/cmake" ${CMAKE_MODULE_PATH})
 set (APP_VERSION_MAJOR 1)
 set (APP_VERSION_MINOR 0)
 
 # compiler flags
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 17)
 if (MSVC)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:precise /EHa /MP")
   string (REGEX REPLACE "/EHsc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -45,7 +45,8 @@ if (MSVC)
 endif()
 
 # Find OpenGL
-set (USE_GLES2 OFF CACHE BOOL "Use OpenGL ES instead of desktop OpenGL")
+#set (USE_GLES2 OFF CACHE BOOL "Use OpenGL ES instead of desktop OpenGL")
+set (USE_GLES2 ON)
 if (NOT WIN32 AND NOT APPLE)
   set (OpenGL_GL_PREFERENCE "GLVND")
 endif()
@@ -58,7 +59,7 @@ endif()
 
 # Find GTK
 find_package (PkgConfig REQUIRED)
-pkg_check_modules (GTKMM REQUIRED gtkmm-3.0)
+pkg_check_modules (GTKMM REQUIRED gtkmm-4.0)
 message (STATUS "GTKMM_INCLUDE_DIRS=${GTKMM_INCLUDE_DIRS}")
 message (STATUS "GTKMM_LIBRARY_DIRS=${GTKMM_LIBRARY_DIRS}")
 include_directories(${GTKMM_INCLUDE_DIRS})

@@ -24,6 +24,44 @@ public: //! @name GTK application pre-setup for OCCT 3D Viewer integration
 
 public: //! @name methods for wrapping GTK input events into Aspect_WindowInputListener events
 
+  //! Map GTK event mouse button to Aspect_VKeyMouse.
+  static Aspect_VKeyMouse gtkMouseButton2VKey(guint theButton);
+
+  //! Map GTK key to virtual key.
+  static Aspect_VKey gtkKey2VKey(guint theKeyVal, guint theKeyCode);
+
+#if (GTK_MAJOR_VERSION >= 4)
+  //! Map GTK modifiers to Aspect_VKeyFlags.
+  static Aspect_VKeyFlags gtkModifiers2VKeys(Gdk::ModifierType theType);
+
+  //! Queue GTK mouse motion event to OCCT listener.
+  static bool gtkHandleMotionEvent(Aspect_WindowInputListener& theListener,
+                                   const Handle(V3d_View)& theView,
+                                   const Graphic3d_Vec2d& thePnt,
+                                   const Aspect_VKeyFlags theFlags);
+
+  //! Queue GTK mouse button pressed event to OCCT listener.
+  static bool gtkHandleButtonPressedEvent(Aspect_WindowInputListener& theListener,
+                                          const Handle(V3d_View)& theView,
+                                          const Graphic3d_Vec2d& thePnt,
+                                          const unsigned int theBtn,
+                                          const Aspect_VKeyFlags theFlags);
+
+  //! Queue GTK mouse button released event to OCCT listener.
+  static bool gtkHandleButtonReleasedEvent(Aspect_WindowInputListener& theListener,
+                                           const Handle(V3d_View)& theView,
+                                           const Graphic3d_Vec2d& thePnt,
+                                           const unsigned int theBtn,
+                                           const Aspect_VKeyFlags theFlags);
+
+  //! Queue GTK mouse wheel event to OCCT listener.
+  static bool gtkHandleScrollEvent(Aspect_WindowInputListener& theListener,
+                                   const Handle(V3d_View)& theView,
+                                   const Graphic3d_Vec2d& theDelta);
+#else
+  //! Map GTK event mouse flags to Aspect_VKeyFlags.
+  static Aspect_VKeyFlags gtkMouseFlags2VKeys(guint theFlags);
+
   //! Queue GTK mouse motion event to OCCT listener.
   static bool gtkHandleMotionEvent(Aspect_WindowInputListener& theListener,
                                    const Handle(V3d_View)& theView,
@@ -43,13 +81,7 @@ public: //! @name methods for wrapping GTK input events into Aspect_WindowInputL
   static bool gtkHandleScrollEvent(Aspect_WindowInputListener& theListener,
                                    const Handle(V3d_View)& theView,
                                    const GdkEventScroll* theEvent);
-
-  //! Map GTK event mouse button to Aspect_VKeyMouse.
-  static Aspect_VKeyMouse gtkMouseButton2VKey(guint theButton);
-
-  //! Map GTK event mouse flags to Aspect_VKeyFlags.
-  static Aspect_VKeyFlags gtkMouseFlags2VKeys(guint theFlags);
-
+#endif
 };
 
 #endif // _OcctGtkTools_HeaderFile
