@@ -1,32 +1,38 @@
 // Copyright (c) 2023 Kirill Gavrilov
 
-#ifndef _OcctGtkViewer_HeaderFile
-#define _OcctGtkViewer_HeaderFile
+#ifndef _OcctGtkGLAreaViewer_HeaderFile
+#define _OcctGtkGLAreaViewer_HeaderFile
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
 #include <AIS_ViewCube.hxx>
-#include <Aspect_NeutralWindow.hxx>
 #include <V3d_Viewer.hxx>
 #include <V3d_View.hxx>
 
 #include <gtkmm.h>
 
-#include <vector>
-
-class Aspect_NeutralWindow;
-class OpenGl_Context;
-
-//! GTK window widget with embedded OCCT Viewer.
-class OcctGtkViewer : public Gtk::Window, public AIS_ViewController
+//! GTK GLArea widget with embedded OCCT Viewer.
+class OcctGtkGLAreaViewer : public Gtk::GLArea, public AIS_ViewController
 {
 public:
 
   //! Main constructor.
-  OcctGtkViewer();
+  OcctGtkGLAreaViewer();
 
   //! Destructor.
-  virtual ~OcctGtkViewer();
+  virtual ~OcctGtkGLAreaViewer();
+
+  //! Return Viewer.
+  const Handle(V3d_Viewer)& Viewer() const { return myViewer; }
+
+  //! Return View.
+  const Handle(V3d_View)& View() const { return myView; }
+
+  //! Return AIS context.
+  const Handle(AIS_InteractiveContext)& Context() const { return myContext; }
+
+  //! Return GL info.
+  const TCollection_AsciiString& GetGlInfo() const { return myGlInfo; }
 
 protected:
 
@@ -53,9 +59,6 @@ protected:
   //! Redraw viewer content.
   bool onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& theGlCtx);
 
-  //! Value changed event.
-  void onValueChanged(const Glib::RefPtr<Gtk::Adjustment>& theAdj);
-
 protected:
 
   //! Print OpenGL context info.
@@ -75,12 +78,8 @@ protected:
   Handle(AIS_InteractiveContext) myContext;
   Handle(AIS_ViewCube)           myViewCube;  //!< view cube object
   float                          myDevicePixelRatio = 1.0f; //!< device pixel ratio for handling high DPI displays
-
-  Gtk::Box    myVBox;
-  Gtk::GLArea myGLArea;
-  Gtk::Box    myControls;
-  Gtk::Button myQuitButton;
+  TCollection_AsciiString        myGlInfo;
 
 };
 
-#endif // _OcctGtkViewer_HeaderFile
+#endif // _OcctGtkGLAreaViewer_HeaderFile

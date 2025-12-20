@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Kirill Gavrilov
 
-#include "OcctGtkViewer.h"
+#include "OcctGtkWindowSample.h"
 
 #include "../occt-gtk-tools/OcctGtkTools.h"
 
@@ -12,7 +12,7 @@
 int main(int theNbArgs, char* theArgVec[])
 {
   OSD::SetSignal(false);
-  OSD::SetSignalStackTraceLength(10);
+  //OSD::SetSignalStackTraceLength(10);
 
   // force X11 backend for OpenGL initialization using GLX
   // (should be done in sync with OCCT configuration)
@@ -23,7 +23,7 @@ int main(int theNbArgs, char* theArgVec[])
                              "org.opencascade.samples.gtkmm.glarea",
                              Gio::APPLICATION_NON_UNIQUE);
 
-  OcctGtkViewer aGtkWin;
+  OcctGtkWindowSample aGtkWin;
   aGtkWin.show_all();
   return aGtkApp->run(aGtkWin);
 }

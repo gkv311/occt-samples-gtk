@@ -94,8 +94,10 @@ add_executable (${PROJECT_NAME}
   ../occt-gtk-tools/OcctGtkTools.h
   ../occt-gtk-tools/OcctGtkTools.cpp
   main.cpp
-  OcctGtkViewer.h
-  OcctGtkViewer.cpp
+  OcctGtkGLAreaViewer.h
+  OcctGtkGLAreaViewer.cpp
+  OcctGtkWindowSample.h
+  OcctGtkWindowSample.cpp
 )
 target_link_libraries (${PROJECT_NAME} PRIVATE ${GTKMM_LIBRARIES} ${OpenCASCADE_LIBS})
 if (USE_GLES2)
