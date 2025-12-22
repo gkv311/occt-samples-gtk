@@ -45,14 +45,7 @@ if (MSVC)
 endif()
 
 # Find OpenGL
-#set (USE_GLES2 OFF CACHE BOOL "Use OpenGL ES instead of desktop OpenGL")
-if (WIN32)
-  # seems to be unsupported on Windows
-  set (USE_GLES2 OFF)
-else()
-  # most-compatible configuration on Linux, but requires OCCT built with TKOpenGles toolkit
-  set (USE_GLES2 ON)
-endif()
+set (USE_GLES2 OFF CACHE BOOL "Use OpenGL ES instead of desktop OpenGL")
 if (NOT WIN32 AND NOT APPLE)
   set (OpenGL_GL_PREFERENCE "GLVND")
 endif()

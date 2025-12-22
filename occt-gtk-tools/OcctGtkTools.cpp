@@ -24,6 +24,24 @@ void OcctGtkTools::gtkGlPlatformSetup()
   OSD_Environment aBackend("GDK_BACKEND");
   aBackend.SetValue("x11");
   aBackend.Build();
+
+  // GTK4 tries to use EGL instead of GLX by default;
+  // there is no public API to manage that
+#if !defined(HAVE_GLES2) && (GTK_MAJOR_VERSION >= 4)
+#if GTK_CHECK_VERSION(4, 16, 6)
+  OSD_Environment aGtkDisable("GDK_DISABLE");
+  aGtkDisable.SetValue(!aGtkDisable.Value().IsEmpty() ? aGtkDisable.Value() + ",egl" : "egl");
+  aGtkDisable.Build();
+#else
+  OSD_Environment aGtkDebug("GDK_DEBUG");
+  if (aGtkDebug.Value().IsEmpty())
+  {
+    aGtkDebug.SetValue(!aGtkDebug.Value().IsEmpty() ? aGtkDebug.Value() + ",gl-glx" : "gl-glx");
+    aGtkDebug.Build();
+  }
+#endif
+#endif
+
 #endif
 }
 
