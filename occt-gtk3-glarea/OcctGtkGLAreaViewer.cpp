@@ -251,11 +251,9 @@ void OcctGtkGLAreaViewer::onGlAreaReleased()
 
     // release OCCT viewer on application close
     Handle(Aspect_DisplayConnection) aDisp;
-    if (!myContext.IsNull())
+    if (!myView.IsNull())
     {
       aDisp = myViewer->Driver()->GetDisplayConnection();
-      myContext->RemoveAll(false);
-      myContext.Nullify();
       myView->Remove();
       myView.Nullify();
       myViewer.Nullify();
