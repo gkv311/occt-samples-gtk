@@ -2,7 +2,7 @@ OCCT 3D Viewer setup within GTK+
 ================================
 
 The samples in this repository demonstrate Open CASCADE Technology (OCCT) 3D Viewer setup
-within GTK+ (gtkmm) GUI framework on Linux platform.
+within GTK+ (gtkmm) GUI framework on Linux and Windows platforms.
 
 ![sample screenshot](/images/occt_gtkmm_sample.png)
 
@@ -12,6 +12,8 @@ Use *CMake* for building the project.
 See `CMakeLists.txt` in the folder defining building rules.
 Use `cmake-gui` or command-line interface for configuring project dependencies GTK+ (gtkmm-3.0/gtkmm-4.0), OpenGL and Open CASCADE Technology (OCCT) libraries.
 Building has been checked within development snapshot of OCCT 7.6.0 on Xubuntu 21.04.
+
+On Windows platform, building has been checked with MinGW builds of GTK (from MSYS2 packages).
 
 ## OCCT Gtk::GLArea sample for GTK3
 
