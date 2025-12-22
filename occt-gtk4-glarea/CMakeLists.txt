@@ -102,7 +102,7 @@ add_executable (${PROJECT_NAME}
 )
 target_link_libraries (${PROJECT_NAME} PRIVATE ${GTKMM_LIBRARIES} ${OpenCASCADE_LIBS})
 if (USE_GLES2)
-  target_link_libraries (${PROJECT_NAME} PRIVATE TKOpenGles GLESv2)
+  target_link_libraries (${PROJECT_NAME} PRIVATE TKOpenGles GLESv2 EGL)
 else()
   target_link_libraries (${PROJECT_NAME} PRIVATE TKOpenGl ${OPENGL_LIBRARIES})
 endif()

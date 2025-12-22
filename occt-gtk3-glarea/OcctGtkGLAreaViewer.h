@@ -3,13 +3,18 @@
 #ifndef _OcctGtkGLAreaViewer_HeaderFile
 #define _OcctGtkGLAreaViewer_HeaderFile
 
+// workaround macros clash with Gtk::Collation::UNICODE
+// (UNICODE is a standard macros used by WinAPI)
+#ifdef UNICODE
+#undef UNICODE
+#endif
+#include <gtkmm.h>
+
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
 #include <AIS_ViewCube.hxx>
 #include <V3d_Viewer.hxx>
 #include <V3d_View.hxx>
-
-#include <gtkmm.h>
 
 //! GTK GLArea widget with embedded OCCT Viewer.
 class OcctGtkGLAreaViewer : public Gtk::GLArea, public AIS_ViewController

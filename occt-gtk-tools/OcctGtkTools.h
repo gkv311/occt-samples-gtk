@@ -3,11 +3,16 @@
 #ifndef _OcctGtkTools_HeaderFile
 #define _OcctGtkTools_HeaderFile
 
+// workaround macros clash with Gtk::Collation::UNICODE
+// (UNICODE is a standard macros used by WinAPI)
+#ifdef UNICODE
+#undef UNICODE
+#endif
+#include <gtkmm.h>
+
 #include <Aspect_WindowInputListener.hxx>
 #include <Message_Gravity.hxx>
 #include <Quantity_ColorRGBA.hxx>
-
-#include <gtkmm.h>
 
 class OpenGl_Caps;
 class V3d_View;

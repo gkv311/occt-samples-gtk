@@ -5,8 +5,6 @@
 
 #include "OcctGtkGLAreaViewer.h"
 
-#include <gtkmm.h>
-
 //! GTK window widget with embedded OCCT Viewer.
 class OcctGtkWindowSample : public Gtk::Window
 {
