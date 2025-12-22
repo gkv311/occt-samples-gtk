@@ -12,7 +12,9 @@
 #include <OpenGl_View.hxx>
 #include <OpenGl_Window.hxx>
 
+#if !defined(_WIN32)
 #include <EGL/egl.h>
+#endif
 
 #if !defined(HAVE_GLES2) && !defined(_WIN32)
 #include <GL/glx.h>
@@ -108,7 +110,7 @@ bool OcctGlTools::InitializeGlWindow(const Handle(V3d_View)& theView,
   Handle(OpenGl_Context) aGlCtx = new OpenGl_Context();
   if (!aGlCtx->Init(!aDriver->Options().contextCompatible))
   {
-  #ifndef HAVE_GLES2
+  #if !defined(HAVE_GLES2) && !defined(_WIN32)
     if (eglGetCurrentContext() != EGL_NO_CONTEXT)
     {
       Message::SendFail() << "Error: Wayland session (EGL context) is unsupported";
