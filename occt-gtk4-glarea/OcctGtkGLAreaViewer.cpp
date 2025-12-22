@@ -275,9 +275,13 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
     OCC_CATCH_SIGNALS
     throw_if_error();
 
-    // FBO is not yet initialized?
-    const Graphic3d_Vec2i aViewSize = aLogicalSize * get_scale_factor();
-    myDevicePixelRatio = float(aViewSize.y()) / float(aLogicalSize.y());
+    Glib::RefPtr<Gdk::Surface> aGdkSurf = this->get_native()->get_surface();
+#if ((GTKMM_MAJOR_VERSION == 4 && GTKMM_MINOR_VERSION >= 12) || GTKMM_MAJOR_VERSION >= 5)
+    // fraction scale factor introduced by gtkmm 4.12
+    myDevicePixelRatio = aGdkSurf->get_scale();
+#else
+    myDevicePixelRatio = get_scale_factor();
+#endif
     initPixelScaleRatio();
 
     const bool isFirstInit = myView->Window().IsNull();
@@ -287,9 +291,9 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
 #else
     // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
     //aNativeWin = aGlCtx->Window();
-    Glib::RefPtr<Gdk::Surface> aGdkSurf = this->get_native()->get_surface();
     aNativeWin = gdk_x11_surface_get_xid(aGdkSurf->gobj());
 #endif
+    const Graphic3d_Vec2i aViewSize = Graphic3d_Vec2i(Graphic3d_Vec2d(aLogicalSize) * myDevicePixelRatio + Graphic3d_Vec2d(0.5));
     if (!OcctGlTools::InitializeGlWindow(myView, aNativeWin, aViewSize, myDevicePixelRatio))
     {
       Gtk::MessageDialog* aMsg = new Gtk::MessageDialog("OpenGl_Context is unable to wrap OpenGL context", false, Gtk::MessageType::ERROR);
