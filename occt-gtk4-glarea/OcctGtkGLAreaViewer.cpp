@@ -360,7 +360,11 @@ bool OcctGtkGLAreaViewer::onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& the
 {
   (void )theGlCtx;
   if (myView->Window().IsNull())
+  {
     onGlAreaRealized();
+    make_current();
+    gtk_gl_area_attach_buffers(gobj()); // not wrapped by C++ gtkmm
+  }
 
   if (myView->Window().IsNull())
     return false;
