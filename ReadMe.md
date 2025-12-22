@@ -15,18 +15,22 @@ Building has been checked within development snapshot of OCCT 7.6.0 on Xubuntu 2
 
 On Windows platform, building has been checked with MinGW builds of GTK (from MSYS2 packages).
 
-## OCCT Gtk::GLArea sample for GTK3
+The CMake option `USE_GLES2` could be used to switch from OpenGL desktop (`TKOpenGl`)
+to OpenGL ES (`TKOpenGles`) implementation, which would require OCCT built with appropriate modules enabled.
 
-Project within `occt-gtk3-glarea` subfolder shows OCCT 3D viewer setup
-from *OpenGL* context created by `Gtk::GLArea` within GTK3 application.
+## OCCT Gtk::GLArea sample
 
-## OCCT Gtk::GLArea sample for GTK4
-
-Project within `occt-gtk4-glarea` subfolder shows OCCT 3D viewer setup
-from *OpenGL ES* context created by `Gtk::GLArea` within GTK4 application.
+Projects within `occt-gtk3-glarea` (GTK3) and `occt-gtk4-glarea` (GTK4) subfolders
+shows OCCT 3D viewer setup from *OpenGL* context created by `Gtk::GLArea` within GTK application.
 
 ## Troubleshooting
 
-The samples relies on X11 backend (`GDK_BACKEND=x11`), so that on Wayland session it will be running through Xwayland (which is expected to be done automatically).
+The samples relies on X11 backend (`GDK_BACKEND=x11`) with GLX (`GDK_DISABLE=egl`),
+so that on Wayland session it will be running through Xwayland (which is expected to be done automatically).
+
+Sample defines these environment variables within `OcctGtkTools::gtkGlPlatformSetup()`
+method called from `main()` before GTK application initialization,
+as GTK provides no public API for managing this
+(these GTK variables are provided 'for debugging purposes' and their behavior can be changed in future).
 
 Some bugs related to `Gtk::GLArea` have been observed with older GTK+ versions (Xubuntu 18.04).
