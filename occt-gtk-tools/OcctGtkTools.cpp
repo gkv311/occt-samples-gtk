@@ -62,8 +62,23 @@ Aspect_VKeyMouse OcctGtkTools::gtkMouseButton2VKey(guint theButton)
 // ================================================================
 // Function : gtkKey2VKey
 // ================================================================
-Aspect_VKey OcctGtkTools::gtkKey2VKey(guint theKeyVal, guint )
+Aspect_VKey OcctGtkTools::gtkKey2VKey(guint theKeyVal, guint theKeyCode)
 {
+  // theKeyCode should be actually used for virtual key, but there is no enumeration for it
+  (void)theKeyCode;
+
+  if (theKeyVal >= GDK_KEY_A && theKeyVal <= GDK_KEY_Z)
+    return Aspect_VKey(theKeyVal - GDK_KEY_A) + Aspect_VKey_A;
+
+  if (theKeyVal >= GDK_KEY_a && theKeyVal <= GDK_KEY_z)
+    return Aspect_VKey(theKeyVal - GDK_KEY_a) + Aspect_VKey_A;
+
+  if (theKeyVal >= GDK_KEY_0 && theKeyVal <= GDK_KEY_9)
+    return Aspect_VKey(theKeyVal - GDK_KEY_0) + Aspect_VKey_0;
+
+  if (theKeyVal >= GDK_KEY_F1 && theKeyVal <= GDK_KEY_F12)
+    return Aspect_VKey(theKeyVal - GDK_KEY_F1) + Aspect_VKey_F1;
+
   switch (theKeyVal)
   {
     case GDK_KEY_Shift_L:
@@ -78,6 +93,30 @@ Aspect_VKey OcctGtkTools::gtkKey2VKey(guint theKeyVal, guint )
     case GDK_KEY_Alt_L:
     case GDK_KEY_Alt_R:
       return Aspect_VKey_Alt;
+    case GDK_KEY_Escape:
+      return Aspect_VKey_Escape;
+    case GDK_KEY_Up:
+      return Aspect_VKey_Up;
+    case GDK_KEY_Down:
+      return Aspect_VKey_Down;
+    case GDK_KEY_Left:
+      return Aspect_VKey_Left;
+    case GDK_KEY_Right:
+      return Aspect_VKey_Right;
+    case GDK_KEY_Home:
+      return Aspect_VKey_Home;
+    case GDK_KEY_End:
+      return Aspect_VKey_End;
+    case GDK_KEY_Page_Up:
+      return Aspect_VKey_PageUp;
+    case GDK_KEY_Page_Down:
+      return Aspect_VKey_PageDown;
+    case GDK_KEY_Return:
+      return Aspect_VKey_Enter;
+    case GDK_KEY_Delete:
+      return Aspect_VKey_Delete;
+    case GDK_KEY_BackSpace:
+      return Aspect_VKey_Backspace;
   }
   return Aspect_VKey_UNKNOWN;
 }

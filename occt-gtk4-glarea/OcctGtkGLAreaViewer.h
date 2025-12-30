@@ -9,6 +9,7 @@
 #undef UNICODE
 #endif
 #include <gtkmm.h>
+#include <gtkmm/eventcontrollerlegacy.h>
 
 #include <AIS_InteractiveContext.hxx>
 #include <AIS_ViewController.hxx>
@@ -41,8 +42,14 @@ public:
 
 protected:
 
+  //! Handle input key.
+  void processKeyPress(Aspect_VKey theKey);
+
+  //! Handle raw event.
+  bool onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEvent);
+
   //! Update modifiers.
-  void updateModifiers();
+  /*void updateModifiers();
 
   //! Handle modifiers changed event.
   bool onModifiersChanged(Gdk::ModifierType theType);
@@ -63,7 +70,7 @@ protected:
   void onMouseButtonReleased(int theNbPressed, double theX, double theY);
 
   //! Handle mouse scroll event.
-  bool onMouseScroll(double theDeltaX, double theDeltaY);
+  bool onMouseScroll(double theDeltaX, double theDeltaY);*/
 
 protected:
 
