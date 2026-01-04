@@ -1,0 +1,14 @@
+# This workflow will run other workflows
+name: Build (All)
+
+on: [push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-gtk3:
+    uses: ./.github/workflows/build_linux_gcc_gtk3.yml
+  linux-gtk4:
+    uses: ./.github/workflows/build_linux_gcc_gtk4.yml
