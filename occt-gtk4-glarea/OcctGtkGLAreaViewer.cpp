@@ -151,6 +151,10 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
   {
     case Gdk::Event::Type::MOTION_NOTIFY:
     {
+      //const bool isEmulated = theEvent->get_pointer_emulated();
+      //if (isEmulated)
+      //  return false;
+
       Graphic3d_Vec2d aPos;
       theEvent->get_position(aPos.x(), aPos.y());
       const Aspect_VKeyFlags aFlags = OcctGtkTools::gtkModifiers2VKeys(theEvent->get_modifier_state());
@@ -163,6 +167,9 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     case Gdk::Event::Type::BUTTON_RELEASE:
     {
       //const bool isEmulated = theEvent->get_pointer_emulated();
+      //if (isEmulated)
+      //  return false;
+
       Graphic3d_Vec2d aPos;
       theEvent->get_position(aPos.x(), aPos.y());
       const Aspect_VKeyFlags aFlags = OcctGtkTools::gtkModifiers2VKeys(theEvent->get_modifier_state());
@@ -183,6 +190,45 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
       theEvent->get_position(aPos.x(), aPos.y());
       const Graphic3d_Vec2i aPnt2i(myView->Window()->ConvertPointToBacking(aPos) + Graphic3d_Vec2d(0.5));
       if (AIS_ViewController::UpdateMouseScroll(Aspect_ScrollDelta(aPnt2i, -aDelta.y())))
+        queue_draw();
+
+      return true;
+    }
+    case Gdk::Event::Type::TOUCH_BEGIN:
+    case Gdk::Event::Type::TOUCH_UPDATE:
+    case Gdk::Event::Type::TOUCH_END:
+    case Gdk::Event::Type::TOUCH_CANCEL:
+    {
+      Graphic3d_Vec2d aPos;
+      theEvent->get_position(aPos.x(), aPos.y());
+
+      const Standard_Size   aTouchId = (Standard_Size)theEvent->get_event_sequence();
+      const Graphic3d_Vec2d aNewPos2d = myView->Window()->ConvertPointToBacking(aPos);
+
+      bool hasUpdates = false;
+      if (theEvent->get_event_type() == Gdk::Event::Type::TOUCH_BEGIN)
+      {
+        hasUpdates = true;
+        AIS_ViewController::AddTouchPoint(aTouchId, aNewPos2d);
+      }
+      else if (theEvent->get_event_type() == Gdk::Event::Type::TOUCH_UPDATE
+            && AIS_ViewController::TouchPoints().Contains(aTouchId))
+      {
+        hasUpdates = true;
+        AIS_ViewController::UpdateTouchPoint(aTouchId, aNewPos2d);
+      }
+      else if ((theEvent->get_event_type() == Gdk::Event::Type::TOUCH_END
+             || theEvent->get_event_type() == Gdk::Event::Type::TOUCH_CANCEL)
+            && AIS_ViewController::RemoveTouchPoint(aTouchId))
+      {
+        hasUpdates = true;
+      }
+      else
+      {
+        return false;
+      }
+
+      if (hasUpdates)
         queue_draw();
 
       return true;
