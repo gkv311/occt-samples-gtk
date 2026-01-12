@@ -53,6 +53,9 @@ protected:
   //! Handle mouse scroll event.
   bool onMouseScroll(GdkEventScroll* theEvent);
 
+  //! Handle multi-touch event.
+  bool onTouch(GdkEventTouch* theEvent);
+
 protected:
 
   //! Allocate OpenGL resources.

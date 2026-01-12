@@ -79,13 +79,24 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   signal_unrealize().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaReleased), false);
   signal_render()   .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRender), false);
 
+  // multi-touch events can be enabled, but on Windows platform they are delivered
+  // concurrently with emulated mouse cursor events, breaking Viewer logic;
+  // might work as expected on other systems that don't generate emulated events
+  const bool toEnableMultitouch = false;
+
   // connect to mouse input events
-  add_events(Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK
-           | Gdk::SMOOTH_SCROLL_MASK  | Gdk::FOCUS_CHANGE_MASK);
+  Gdk::EventMask anEventFilter = Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK
+                               | Gdk::SMOOTH_SCROLL_MASK  | Gdk::FOCUS_CHANGE_MASK;
+  if (toEnableMultitouch)
+    anEventFilter |= Gdk::TOUCH_MASK;
+
+  add_events(anEventFilter);
   signal_motion_notify_event() .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseMotion), false);
   signal_button_press_event()  .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonPressed), false);
   signal_button_release_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonReleased), false);
   signal_scroll_event()        .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseScroll), false);
+  if (toEnableMultitouch)
+    signal_touch_event()       .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onTouch), false);
 }
 
 // ================================================================
@@ -135,6 +146,43 @@ bool OcctGtkGLAreaViewer::onMouseButtonReleased(GdkEventButton* theEvent)
 bool OcctGtkGLAreaViewer::onMouseScroll(GdkEventScroll* theEvent)
 {
   if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, theEvent))
+    queue_draw();
+
+  return true;
+}
+
+// ================================================================
+// Function : onTouch
+// ================================================================
+bool OcctGtkGLAreaViewer::onTouch(GdkEventTouch* theEvent)
+{
+  const Standard_Size   aTouchId = (Standard_Size)theEvent->sequence;
+  const Graphic3d_Vec2d aNewPos2d =
+    myView->Window()->ConvertPointToBacking(Graphic3d_Vec2d(theEvent->x, theEvent->y));
+
+  bool hasUpdates = false;
+  if (theEvent->state == GDK_TOUCH_BEGIN)
+  {
+    hasUpdates = true;
+    AIS_ViewController::AddTouchPoint(aTouchId, aNewPos2d);
+  }
+  else if (theEvent->state == GDK_TOUCH_UPDATE
+        && AIS_ViewController::TouchPoints().Contains(aTouchId))
+  {
+    hasUpdates = true;
+    AIS_ViewController::UpdateTouchPoint(aTouchId, aNewPos2d);
+  }
+  else if ((theEvent->state == GDK_TOUCH_END || theEvent->state == GDK_TOUCH_CANCEL)
+        && AIS_ViewController::RemoveTouchPoint(aTouchId))
+  {
+    hasUpdates = true;
+  }
+  else
+  {
+    return false;
+  }
+
+  if (hasUpdates)
     queue_draw();
 
   return true;
