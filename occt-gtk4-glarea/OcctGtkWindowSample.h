@@ -24,15 +24,6 @@ protected:
   //! Value changed event.
   void onValueChanged(const Glib::RefPtr<Gtk::Adjustment>& theAdj);
 
-  //! Forward modifiers change event to Viewer.
-  bool onModifiersChanged(Gdk::ModifierType ) { return myEventCtrlKey->forward(myViewer); }
-
-  //! Forward key pressed event to Viewer.
-  bool onKeyPressed(guint , guint , Gdk::ModifierType ) { return myEventCtrlKey->forward(myViewer); }
-
-  //! Forward key released event to Viewer.
-  void onKeyReleased(guint , guint , Gdk::ModifierType ) { myEventCtrlKey->forward(myViewer); }
-
 protected:
 
   Gtk::Box    myVBox;
@@ -41,8 +32,6 @@ protected:
   Gtk::Button myQuitButton;
 
   OcctGtkGLAreaViewer myViewer;
-
-  Glib::RefPtr<Gtk::EventControllerKey> myEventCtrlKey;
 
 };
 

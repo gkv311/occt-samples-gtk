@@ -31,6 +31,11 @@ typedef Aspect_DisplayConnection Xw_DisplayConnection;
 // ================================================================
 OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 {
+  // receive keyboard events when focused
+  set_can_focus(true);
+  set_focusable(true);
+  set_focus_on_click(true);
+
   Handle(Aspect_DisplayConnection) aDisp = new Xw_DisplayConnection();
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver(aDisp, false);
   // lets Gtk::GLArea to manage buffer swap
@@ -120,6 +125,9 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   const Gtk::GestureClick* aClickPtr = anEventCtrlClick.get();
   anEventCtrlClick->signal_pressed().connect([this, aClickPtr](int , double theX, double theY)
   {
+    if (get_focus_on_click())
+      grab_focus(); // grab keyboard input
+
     if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, Graphic3d_Vec2d(theX, theY),
                                            aClickPtr->get_current_button(), myKeyModifiers, true))
       queue_draw();
@@ -148,6 +156,18 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   anEventCtrlKey->signal_key_released().connect([this](guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType)
                                                 { onKey(theKeyVal, theKeyCode, theType, false); }, false);
   add_controller(anEventCtrlKey);
+
+  Glib::RefPtr<Gtk::EventControllerFocus> anEventCtrlFocus = Gtk::EventControllerFocus::create();
+  anEventCtrlFocus->signal_enter().connect([this]()
+  {
+    AIS_ViewController::ProcessFocus(true);
+  }, false);
+  anEventCtrlFocus->signal_leave().connect([this]()
+  {
+    AIS_ViewController::ProcessFocus(false);
+    myKeyModifiers = Aspect_VKeyFlags_NONE;
+  }, false);
+  add_controller(anEventCtrlFocus);
 }
 
 // ================================================================
@@ -183,6 +203,9 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     case Gdk::Event::Type::BUTTON_PRESS:
     case Gdk::Event::Type::BUTTON_RELEASE:
     {
+      if (get_focus_on_click())
+        grab_focus(); // grab keyboard input
+
       //if (theEvent->get_pointer_emulated()) { return false; }
 
       Graphic3d_Vec2d aPos;
@@ -251,6 +274,9 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     case Gdk::Event::Type::KEY_RELEASE:
       return onKey(theEvent->get_keyval(), theEvent->get_keycode(), theEvent->get_modifier_state(),
                    theEvent->get_event_type() == Gdk::Event::Type::KEY_PRESS);
+    case Gdk::Event::Type::FOCUS_CHANGE:
+      AIS_ViewController::ProcessFocus(theEvent->get_focus_in());
+      return true;
     default:
       break;
   }

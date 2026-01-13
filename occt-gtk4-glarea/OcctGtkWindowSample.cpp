@@ -55,13 +55,6 @@ OcctGtkWindowSample::OcctGtkWindowSample()
     myControls.append(myQuitButton);
   }
 
-  /// TODO why this is needed here?
-  myEventCtrlKey = Gtk::EventControllerKey::create();
-  myEventCtrlKey->signal_modifiers().connect(sigc::mem_fun(*this, &OcctGtkWindowSample::onModifiersChanged), false);
-  myEventCtrlKey->signal_key_pressed().connect(sigc::mem_fun(*this, &OcctGtkWindowSample::onKeyPressed), false);
-  myEventCtrlKey->signal_key_released().connect(sigc::mem_fun(*this, &OcctGtkWindowSample::onKeyReleased), false);
-  add_controller(myEventCtrlKey);
-
   // display dummy shape for testing
   {
     TopoDS_Shape aBox = BRepPrimAPI_MakeBox(100.0, 50.0, 90.0).Shape();
