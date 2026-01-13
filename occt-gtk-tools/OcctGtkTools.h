@@ -45,19 +45,13 @@ public: //! @name methods for wrapping GTK input events into Aspect_WindowInputL
                                    const Graphic3d_Vec2d& thePnt,
                                    const Aspect_VKeyFlags theFlags);
 
-  //! Queue GTK mouse button pressed event to OCCT listener.
-  static bool gtkHandleButtonPressedEvent(Aspect_WindowInputListener& theListener,
-                                          const Handle(V3d_View)& theView,
-                                          const Graphic3d_Vec2d& thePnt,
-                                          const unsigned int theBtn,
-                                          const Aspect_VKeyFlags theFlags);
-
-  //! Queue GTK mouse button released event to OCCT listener.
-  static bool gtkHandleButtonReleasedEvent(Aspect_WindowInputListener& theListener,
-                                           const Handle(V3d_View)& theView,
-                                           const Graphic3d_Vec2d& thePnt,
-                                           const unsigned int theBtn,
-                                           const Aspect_VKeyFlags theFlags);
+  //! Queue GTK mouse button pressed/released event to OCCT listener.
+  static bool gtkHandleButtonEvent(Aspect_WindowInputListener& theListener,
+                                   const Handle(V3d_View)& theView,
+                                   const Graphic3d_Vec2d& thePnt,
+                                   const unsigned int theBtn,
+                                   const Aspect_VKeyFlags theFlags,
+                                   const bool theIsPressed);
 
   //! Queue GTK mouse wheel event to OCCT listener.
   static bool gtkHandleScrollEvent(Aspect_WindowInputListener& theListener,

@@ -78,33 +78,76 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   signal_unrealize().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaReleased), false);
   signal_render()   .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRender), false);
 
-  // connect to input events using raw controller
-  Glib::RefPtr<Gtk::EventControllerLegacy> anEventCtrl = Gtk::EventControllerLegacy::create();
-  anEventCtrl->signal_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onRawEvent), false);
-  add_controller(anEventCtrl);
+  // 'Legacy' (Gtk::EventControllerLegacy) vs. 'modern' input controllers.
+  // Gtk::EventControllerLegacy is much simpler to configure with the Viewer.
+  // Modern controllers do not provide raw multi-touch events (only controllers for dedicated gestures).
+  // - Bug in Gtk::GestureClick:
+  //   when multiple mouse buttons are pressed, release event doesn't come.
+  // - Bug in Gtk::EventControllerLegacy:
+  //   on Windows platform mouse events come with offset (not reproduced on Linux).
+  const bool toUseModernControllers = false;
+  if (!toUseModernControllers)
+  {
+    // connect to input events using raw controller
+    Glib::RefPtr<Gtk::EventControllerLegacy> anEventCtrl = Gtk::EventControllerLegacy::create();
+    anEventCtrl->signal_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onRawEvent), false);
+    add_controller(anEventCtrl);
+    return;
+  }
 
   // connect to input events using 'modern' controllers (but it is buggy)
-  /*Glib::RefPtr<Gtk::EventControllerMotion> anEventCtrlMotion = Gtk::EventControllerMotion::create();
-  anEventCtrlMotion->signal_motion().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMotionMove), false);
+  Glib::RefPtr<Gtk::EventControllerMotion> anEventCtrlMotion = Gtk::EventControllerMotion::create();
+  anEventCtrlMotion->signal_motion().connect([this](double theX, double theY)
+  {
+    if (OcctGtkTools::gtkHandleMotionEvent(*this, myView, Graphic3d_Vec2d(theX, theY), myKeyModifiers))
+      queue_draw();
+  }, false);
   add_controller(anEventCtrlMotion);
 
   Glib::RefPtr<Gtk::EventControllerScroll> anEventCtrlScroll = Gtk::EventControllerScroll::create();
   anEventCtrlScroll->set_flags(Gtk::EventControllerScroll::Flags::VERTICAL);
-  anEventCtrlScroll->signal_scroll().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseScroll), false);
+  anEventCtrlScroll->signal_scroll().connect([this](double theDeltaX, double theDeltaY) -> bool
+  {
+    if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, Graphic3d_Vec2d(theDeltaX, theDeltaY)))
+      queue_draw();
+
+    return true;
+  }, false);
   add_controller(anEventCtrlScroll);
 
-  myEventCtrlClick = Gtk::GestureClick::create();
-  myEventCtrlClick->set_button(0); // listen to all buttons
-  myEventCtrlClick->signal_pressed().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonPressed), false);
-  myEventCtrlClick->signal_released().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonReleased), false);
-  add_controller(myEventCtrlClick);
+  Glib::RefPtr<Gtk::GestureClick> anEventCtrlClick = Gtk::GestureClick::create();
+  anEventCtrlClick->set_button(0); // listen to all buttons
+  const Gtk::GestureClick* aClickPtr = anEventCtrlClick.get();
+  anEventCtrlClick->signal_pressed().connect([this, aClickPtr](int , double theX, double theY)
+  {
+    if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, Graphic3d_Vec2d(theX, theY),
+                                           aClickPtr->get_current_button(), myKeyModifiers, true))
+      queue_draw();
+  }, false);
+  anEventCtrlClick->signal_released().connect([this, aClickPtr](int , double theX, double theY)
+  {
+    if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, Graphic3d_Vec2d(theX, theY),
+                                           aClickPtr->get_current_button(), myKeyModifiers, false))
+      queue_draw();
+  }, false);
+  add_controller(anEventCtrlClick);
 
-  /// TODO why this doesn't work without forwarding from Window? events do not reset modifiers...
-  myEventCtrlKey = Gtk::EventControllerKey::create();
-  myEventCtrlKey->signal_modifiers().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onModifiersChanged), false);
-  myEventCtrlKey->signal_key_pressed().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onKeyPressed), false);
-  myEventCtrlKey->signal_key_released().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onKeyReleased), false);
-  add_controller(myEventCtrlKey);*/
+  /// TODO why this doesn't work without forwarding from parent Gtk::Window? events do not reset modifiers...
+  Glib::RefPtr<Gtk::EventControllerKey> anEventCtrlKey = Gtk::EventControllerKey::create();
+  anEventCtrlKey->signal_modifiers().connect([this](Gdk::ModifierType theType) -> bool
+  {
+    /// TODO this doesn't work as expected
+    (void)theType;
+    //const Aspect_VKeyFlags anOldFlags = myKeyModifiers;
+    //myKeyModifiers = OcctGtkTools::gtkModifiers2VKeys(theType);
+    //return true;
+    return false;
+  }, false);
+  anEventCtrlKey->signal_key_pressed().connect([this](guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType) -> bool
+                                               { return onKey(theKeyVal, theKeyCode, theType, true); }, false);
+  anEventCtrlKey->signal_key_released().connect([this](guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType)
+                                                { onKey(theKeyVal, theKeyCode, theType, false); }, false);
+  add_controller(anEventCtrlKey);
 }
 
 // ================================================================
@@ -113,30 +156,6 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 OcctGtkGLAreaViewer::~OcctGtkGLAreaViewer()
 {
   //
-}
-
-// ================================================================
-// Function : processKeyPress
-// ================================================================
-void OcctGtkGLAreaViewer::processKeyPress(Aspect_VKey theKey)
-{
-  if (myView.IsNull())
-    return;
-
-  switch (theKey)
-  {
-    case Aspect_VKey_Escape:
-    {
-      std::exit(0);
-      break;
-    }
-    case Aspect_VKey_F:
-    {
-      myView->FitAll(0.01, false);
-      queue_draw();
-      break;
-    }
-  }
 }
 
 // ================================================================
@@ -151,9 +170,7 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
   {
     case Gdk::Event::Type::MOTION_NOTIFY:
     {
-      //const bool isEmulated = theEvent->get_pointer_emulated();
-      //if (isEmulated)
-      //  return false;
+      //if (theEvent->get_pointer_emulated()) { return false; }
 
       Graphic3d_Vec2d aPos;
       theEvent->get_position(aPos.x(), aPos.y());
@@ -166,19 +183,16 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     case Gdk::Event::Type::BUTTON_PRESS:
     case Gdk::Event::Type::BUTTON_RELEASE:
     {
-      //const bool isEmulated = theEvent->get_pointer_emulated();
-      //if (isEmulated)
-      //  return false;
+      //if (theEvent->get_pointer_emulated()) { return false; }
 
       Graphic3d_Vec2d aPos;
       theEvent->get_position(aPos.x(), aPos.y());
       const Aspect_VKeyFlags aFlags = OcctGtkTools::gtkModifiers2VKeys(theEvent->get_modifier_state());
-      if (theEvent->get_event_type() == Gdk::Event::Type::BUTTON_PRESS
-        ? OcctGtkTools::gtkHandleButtonPressedEvent(*this, myView, aPos, theEvent->get_button(), aFlags)
-        : OcctGtkTools::gtkHandleButtonReleasedEvent(*this, myView, aPos, theEvent->get_button(), aFlags))
-      {
+      if (OcctGtkTools::gtkHandleButtonEvent(*this, myView,
+                                             aPos, theEvent->get_button(), aFlags,
+                                             theEvent->get_event_type() == Gdk::Event::Type::BUTTON_PRESS))
         queue_draw();
-      }
+
       return true;
     }
     case Gdk::Event::Type::SCROLL:
@@ -235,23 +249,8 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     }
     case Gdk::Event::Type::KEY_PRESS:
     case Gdk::Event::Type::KEY_RELEASE:
-    {
-      const Aspect_VKey aVKey = OcctGtkTools::gtkKey2VKey(theEvent->get_keyval(), theEvent->get_keycode());
-      if (aVKey == Aspect_VKey_UNKNOWN)
-        return false;
-
-      const double aTimeStamp = AIS_ViewController::EventTime();
-      if (theEvent->get_event_type() == Gdk::Event::Type::KEY_PRESS)
-        AIS_ViewController::KeyDown(aVKey, aTimeStamp);
-      else
-        AIS_ViewController::KeyUp(aVKey, aTimeStamp);
-
-      if (theEvent->get_event_type() == Gdk::Event::Type::KEY_PRESS)
-        processKeyPress(aVKey);
-
-      AIS_ViewController::ProcessInput();
-      return true;
-    }
+      return onKey(theEvent->get_keyval(), theEvent->get_keycode(), theEvent->get_modifier_state(),
+                   theEvent->get_event_type() == Gdk::Event::Type::KEY_PRESS);
     default:
       break;
   }
@@ -260,16 +259,27 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
 }
 
 // ================================================================
-// Function : onModifiersChanged
+// Function : onKey
 // ================================================================
-/*bool OcctGtkGLAreaViewer::onModifiersChanged(Gdk::ModifierType theType)
+bool OcctGtkGLAreaViewer::onKey(guint theKeyVal, guint theKeyCode, Gdk::ModifierType , bool theIsPressed)
 {
-  /// TODO this doesn't work as expected
-  (void)theType;
-  //const Aspect_VKeyFlags anOldFlags = myKeyModifiers;
-  //myKeyModifiers = OcctGtkTools::gtkModifiers2VKeys(theType);
-  //return myKeyModifiers != anOldFlags;
-  return false;
+  const Aspect_VKey aVKey = OcctGtkTools::gtkKey2VKey(theKeyVal, theKeyCode);
+  if (aVKey == Aspect_VKey_UNKNOWN)
+    return false;
+
+  const double aTimeStamp = AIS_ViewController::EventTime();
+  if (theIsPressed)
+    AIS_ViewController::KeyDown(aVKey, aTimeStamp);
+  else
+    AIS_ViewController::KeyUp(aVKey, aTimeStamp);
+
+  if (theIsPressed)
+    processKeyPress(aVKey);
+
+  updateModifiers();
+
+  AIS_ViewController::ProcessInput();
+  return true;
 }
 
 // ================================================================
@@ -294,75 +304,28 @@ void OcctGtkGLAreaViewer::updateModifiers()
 }
 
 // ================================================================
-// Function : onKeyPressed
+// Function : processKeyPress
 // ================================================================
-bool OcctGtkGLAreaViewer::onKeyPressed(guint theKeyVal, guint theKeyCode, Gdk::ModifierType )
+void OcctGtkGLAreaViewer::processKeyPress(Aspect_VKey theKey)
 {
-  const Aspect_VKey aVKey = OcctGtkTools::gtkKey2VKey(theKeyVal, theKeyCode);
-  if (aVKey == Aspect_VKey_UNKNOWN)
-    return false;
-
-  const double aTimeStamp = AIS_ViewController::EventTime();
-  AIS_ViewController::KeyDown(aVKey, aTimeStamp);
-  updateModifiers();
-
-  AIS_ViewController::ProcessInput();
-  return true;
-}
-
-// ================================================================
-// Function : onKeyReleased
-// ================================================================
-void OcctGtkGLAreaViewer::onKeyReleased(guint theKeyVal, guint theKeyCode, Gdk::ModifierType )
-{
-  const Aspect_VKey aVKey = OcctGtkTools::gtkKey2VKey(theKeyVal, theKeyCode);
-  if (aVKey == Aspect_VKey_UNKNOWN)
+  if (myView.IsNull())
     return;
 
-  const double aTimeStamp = AIS_ViewController::EventTime();
-  AIS_ViewController::KeyUp(aVKey, aTimeStamp);
-  updateModifiers();
-
-  AIS_ViewController::ProcessInput();
+  switch (theKey)
+  {
+    case Aspect_VKey_Escape:
+    {
+      std::exit(0);
+      break;
+    }
+    case Aspect_VKey_F:
+    {
+      myView->FitAll(0.01, false);
+      queue_draw();
+      break;
+    }
+  }
 }
-
-// ================================================================
-// Function : onMotionMove
-// ================================================================
-void OcctGtkGLAreaViewer::onMotionMove(double theX, double theY)
-{
-  if (OcctGtkTools::gtkHandleMotionEvent(*this, myView, Graphic3d_Vec2d(theX, theY), myKeyModifiers))
-    queue_draw();
-}
-
-// ================================================================
-// Function : onMouseButtonPressed
-// ================================================================
-void OcctGtkGLAreaViewer::onMouseButtonPressed(int , double theX, double theY)
-{
-  if (OcctGtkTools::gtkHandleButtonPressedEvent(*this, myView, Graphic3d_Vec2d(theX, theY), myEventCtrlClick->get_current_button(), myKeyModifiers))
-    queue_draw();
-}
-
-// ================================================================
-// Function : onMouseButtonReleased
-// ================================================================
-void OcctGtkGLAreaViewer::onMouseButtonReleased(int , double theX, double theY)
-{
-  if (OcctGtkTools::gtkHandleButtonReleasedEvent(*this, myView, Graphic3d_Vec2d(theX, theY), myEventCtrlClick->get_current_button(), myKeyModifiers))
-    queue_draw();
-}
-
-// ================================================================
-// Function : onMouseScroll
-// ================================================================
-bool OcctGtkGLAreaViewer::onMouseScroll(double theDeltaX, double theDeltaY)
-{
-  if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, Graphic3d_Vec2d(theDeltaX, theDeltaY)))
-    queue_draw();
-
-  return true;
-}*/
 
 // ================================================================
 // Function : handleViewRedraw

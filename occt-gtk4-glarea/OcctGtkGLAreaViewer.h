@@ -40,37 +40,19 @@ public:
   //! Return GL info.
   const TCollection_AsciiString& GetGlInfo() const { return myGlInfo; }
 
-protected:
+protected: //! @name callbacks for modern-style controllers
+
+  //! Update modifiers.
+  void updateModifiers();
 
   //! Handle input key.
   void processKeyPress(Aspect_VKey theKey);
 
+  //! Handle key pressed/released event from Gtk::EventControllerKey.
+  bool onKey(guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType, bool theIsPressed);
+
   //! Handle raw event.
   bool onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEvent);
-
-  //! Update modifiers.
-  /*void updateModifiers();
-
-  //! Handle modifiers changed event.
-  bool onModifiersChanged(Gdk::ModifierType theType);
-
-  //! Handle key pressed event.
-  bool onKeyPressed(guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType);
-
-  //! Handle key released event.
-  void onKeyReleased(guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType);
-
-  //! Handle mouse movement event.
-  void onMotionMove(double theX, double theY);
-
-  //! Handle mouse button press event.
-  void onMouseButtonPressed(int theNbPressed, double theX, double theY);
-
-  //! Handle mouse button released event.
-  void onMouseButtonReleased(int theNbPressed, double theX, double theY);
-
-  //! Handle mouse scroll event.
-  bool onMouseScroll(double theDeltaX, double theDeltaY);*/
 
 protected:
 
@@ -103,9 +85,6 @@ protected:
   Handle(AIS_ViewCube)           myViewCube;  //!< view cube object
   float                          myDevicePixelRatio = 1.0f; //!< device pixel ratio for handling high DPI displays
   TCollection_AsciiString        myGlInfo;
-
-  Glib::RefPtr<Gtk::EventControllerKey> myEventCtrlKey;
-  Glib::RefPtr<Gtk::GestureClick>       myEventCtrlClick;
 
   Aspect_VKeyFlags myKeyModifiers = Aspect_VKeyFlags_NONE;
 
