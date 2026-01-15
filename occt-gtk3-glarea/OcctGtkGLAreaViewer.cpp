@@ -32,7 +32,10 @@ typedef Aspect_DisplayConnection Xw_DisplayConnection;
 // ================================================================
 OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 {
-  Handle(Aspect_DisplayConnection) aDisp = new Xw_DisplayConnection();
+  Handle(Aspect_DisplayConnection) aDisp;
+#if !defined(__APPLE__) && !defined(_WIN32)
+  aDisp = new Xw_DisplayConnection();
+#endif
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver(aDisp, false);
   // lets Gtk::GLArea to manage buffer swap
   aDriver->ChangeOptions().buffersNoSwap = true;

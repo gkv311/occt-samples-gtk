@@ -36,7 +36,10 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   set_focusable(true);
   set_focus_on_click(true);
 
-  Handle(Aspect_DisplayConnection) aDisp = new Xw_DisplayConnection();
+  Handle(Aspect_DisplayConnection) aDisp;
+#if !defined(__APPLE__) && !defined(_WIN32)
+  aDisp = new Xw_DisplayConnection();
+#endif
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver(aDisp, false);
   // lets Gtk::GLArea to manage buffer swap
   aDriver->ChangeOptions().buffersNoSwap = true;
