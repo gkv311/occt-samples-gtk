@@ -73,7 +73,7 @@ Handle(OpenGl_Context) OcctGlTools::GetGlContext(const Handle(V3d_View)& theView
 Aspect_Drawable OcctGlTools::GetGlNativeWindow(Aspect_Drawable theNativeWin)
 {
   Aspect_Drawable aNativeWin = (Aspect_Drawable)theNativeWin;
-#ifdef HAVE_GLES2
+#if defined(HAVE_WAYLAND) || defined(HAVE_GLES2)
   //
 #elif defined(_WIN32)
   HDC  aWglDevCtx = wglGetCurrentDC();
@@ -110,7 +110,7 @@ bool OcctGlTools::InitializeGlWindow(const Handle(V3d_View)& theView,
   Handle(OpenGl_Context) aGlCtx = new OpenGl_Context();
   if (!aGlCtx->Init(!aDriver->Options().contextCompatible))
   {
-  #if !defined(HAVE_GLES2) && !defined(_WIN32)
+  #if !defined(HAVE_WAYLAND) && !defined(HAVE_GLES2) && !defined(_WIN32)
     if (eglGetCurrentContext() != EGL_NO_CONTEXT)
     {
       Message::SendFail() << "Error: Wayland session (EGL context) is unsupported";
@@ -127,7 +127,7 @@ bool OcctGlTools::InitializeGlWindow(const Handle(V3d_View)& theView,
     aWindow = new OcctNeutralWindow();
     aWindow->SetVirtual(true);
 
-  #ifdef HAVE_GLES2
+  #if defined(HAVE_WAYLAND) || defined(HAVE_GLES2)
     // wrap EGL surface
     EGLContext anEglCtx     = eglGetCurrentContext();
     EGLContext anEglDisplay = eglGetCurrentDisplay();
@@ -167,19 +167,20 @@ bool OcctGlTools::InitializeGlWindow(const Handle(V3d_View)& theView,
 // ================================================================
 bool OcctGlTools::InitializeGlFbo(const Handle(V3d_View)& theView)
 {
-  Handle(OpenGl_Context)     aGlCtx = OcctGlTools::GetGlContext(theView);
-  Handle(OpenGl_FrameBuffer) aDefaultFbo = aGlCtx->DefaultFrameBuffer();
+  Handle(OpenGl_Context)    aGlCtx = OcctGlTools::GetGlContext(theView);
+  Handle(OcctQtFrameBuffer) aDefaultFbo = Handle(OcctQtFrameBuffer)::DownCast(aGlCtx->DefaultFrameBuffer());
   if (aDefaultFbo.IsNull())
-  {
     aDefaultFbo = new OcctQtFrameBuffer();
-    aGlCtx->SetDefaultFrameBuffer(aDefaultFbo);
-  }
+
   if (!aDefaultFbo->InitWrapper(aGlCtx))
   {
     aDefaultFbo.Nullify();
     Message::DefaultMessenger()->Send("Default FBO wrapper creation failed", Message_Fail);
     return false;
   }
+
+  // workaround some bugs (legacy code in OpenGl_Window::init() for surface-less EGL context)
+  aGlCtx->SetDefaultFrameBuffer(Handle(OpenGl_FrameBuffer)());
 
   Graphic3d_Vec2i aViewSizeOld;
   const Graphic3d_Vec2i aViewSizeNew = aDefaultFbo->GetVPSize();
@@ -199,6 +200,7 @@ bool OcctGlTools::InitializeGlFbo(const Handle(V3d_View)& theView)
     }
 #endif
   }
+  aGlCtx->SetDefaultFrameBuffer(aDefaultFbo);
   return true;
 }
 

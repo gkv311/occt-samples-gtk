@@ -10,18 +10,10 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <OpenGl_FrameBuffer.hxx>
 
-#if !defined(__APPLE__) && !defined(_WIN32) && defined(__has_include)
-  #if __has_include(<Xw_DisplayConnection.hxx>)
-    #include <Xw_DisplayConnection.hxx>
-    #define USE_XW_DISPLAY
-  #endif
-#endif
-#ifndef USE_XW_DISPLAY
-typedef Aspect_DisplayConnection Xw_DisplayConnection;
-#endif
-
 #ifdef _WIN32
   //
+#elif defined(HAVE_WAYLAND)
+  #include <gdk/wayland/gdkwayland.h>
 #else
   #include <gdk/x11/gdkx.h>
 #endif
@@ -37,7 +29,7 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   set_focus_on_click(true);
 
   Handle(Aspect_DisplayConnection) aDisp;
-#if !defined(__APPLE__) && !defined(_WIN32)
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined(HAVE_WAYLAND)
   aDisp = new Xw_DisplayConnection();
 #endif
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver(aDisp, false);
@@ -77,10 +69,13 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 
 #ifdef HAVE_GLES2
   set_use_es(true);
+#else
+  set_use_es(false);
 #endif
 
   // connect to Gtk::GLArea events
-  signal_realize()  .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRealized));
+  // GTK4 calls signal_realize() with 0x0 dimensions making 3D Viewer initialization impossible
+  //signal_realize().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRealized));
   // important that the unrealize signal calls our handler to clean up
   // GL resources _before_ the default unrealize handler is called (the "false")
   signal_unrealize().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaReleased), false);
@@ -411,14 +406,47 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
   if (aLogicalSize.x() == 0 || aLogicalSize.y() == 0)
     return;
 
+  // check OpenGL vs. OpenGL ES context
+  const Gdk::GLApi anApi = get_context()->get_api2();
+#ifdef HAVE_GLES2
+  if (anApi != Gdk::GLApi::GLES)
+  {
+    Message::SendFail() << "Broken configuration: OpenGL ES is expected, but dekstop OpenGL created\n";
+    return;
+  }
+#else
+  if (anApi != Gdk::GLApi::GL)
+  {
+    Message::SendFail() << "Broken configuration: desktop OpenGL is expected, but OpenGL ES created\n";
+    return;
+  }
+#endif
+
+  // check Wayland vs. X11 backend
+  Glib::RefPtr<Gdk::Surface> aGdkSurf = this->get_native()->get_surface();
+  Aspect_Drawable aNativeWin = 0;
+#if defined(HAVE_WAYLAND)
+  struct wl_surface* aWlSurf = gdk_wayland_surface_get_wl_surface(aGdkSurf->gobj());
+  if (aWlSurf == nullptr)
+  {
+    Message::SendFail() << "Broken configuration: Wayland surface is expected\n";
+    return;
+  }
+#elif !defined(_WIN32) && !defined(__APPLE__)
+  aNativeWin = gdk_x11_surface_get_xid(aGdkSurf->gobj());
+  if (aNativeWin == 0)
+  {
+    Message::SendFail() << "Broken configuration: X11 window is expected\n";
+    return;
+  }
+#endif
+
   try
   {
     OCC_CATCH_SIGNALS
     throw_if_error();
-
-    Glib::RefPtr<Gdk::Surface> aGdkSurf = this->get_native()->get_surface();
 #if ((GTKMM_MAJOR_VERSION == 4 && GTKMM_MINOR_VERSION >= 12) || GTKMM_MAJOR_VERSION >= 5)
-    // fraction scale factor introduced by gtkmm 4.12
+    // fractional scale factor introduced by gtkmm 4.12
     myDevicePixelRatio = aGdkSurf->get_scale();
 #else
     myDevicePixelRatio = get_scale_factor();
@@ -426,14 +454,6 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
     initPixelScaleRatio();
 
     const bool isFirstInit = myView->Window().IsNull();
-    Aspect_Drawable aNativeWin = 0;
-#if defined(_WIN32)
-    //
-#else
-    // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
-    //aNativeWin = aGlCtx->Window();
-    aNativeWin = gdk_x11_surface_get_xid(aGdkSurf->gobj());
-#endif
     const Graphic3d_Vec2i aViewSize = Graphic3d_Vec2i(Graphic3d_Vec2d(aLogicalSize) * myDevicePixelRatio + Graphic3d_Vec2d(0.5));
     if (!OcctGlTools::InitializeGlWindow(myView, aNativeWin, aViewSize, myDevicePixelRatio))
     {
@@ -444,7 +464,7 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
     }
     make_current();
 
-    dumpGlInfo(true, true);
+    dumpGlInfo(true, false);
     if (isFirstInit)
     {
       myContext->Display(myViewCube, 0, 0, false);
@@ -498,6 +518,7 @@ void OcctGtkGLAreaViewer::onGlAreaReleased()
 bool OcctGtkGLAreaViewer::onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& theGlCtx)
 {
   (void )theGlCtx;
+  const bool isFirstInit = myView->Window().IsNull();
   if (myView->Window().IsNull())
   {
     onGlAreaRealized();
@@ -539,6 +560,9 @@ bool OcctGtkGLAreaViewer::onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& the
     // flush pending input events and redraw the viewer
     myView->InvalidateImmediate();
     AIS_ViewController::FlushViewEvents(myContext, myView, true);
+    if (isFirstInit)
+      dumpGlInfo(true, true);
+
     return true;
   }
   catch (const Gdk::GLError& theGlErr)

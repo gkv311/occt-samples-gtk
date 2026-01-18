@@ -22,9 +22,25 @@ void OcctGtkTools::gtkGlPlatformSetup()
   // force X11 backend for OpenGL initialization using GLX
   // (should be done in sync with OCCT configuration)
   OSD_Environment aBackend("GDK_BACKEND");
+#ifdef HAVE_WAYLAND
+  aBackend.SetValue("wayland");
+#else
   aBackend.SetValue("x11");
+#endif
   aBackend.Build();
 
+
+#ifdef HAVE_WAYLAND
+  // TODO GTK 4.14 on Wayland ignores Gtk::GLArea::set_use_es(false) for unknown reason - another bug?
+#ifndef HAVE_GLES2
+  OSD_Environment aGtkDebug("GDK_DEBUG");
+  if (aGtkDebug.Value().IsEmpty())
+  {
+    aGtkDebug.SetValue(!aGtkDebug.Value().IsEmpty() ? aGtkDebug.Value() + ",gl-prefer-gl" : "gl-prefer-gl");
+    aGtkDebug.Build();
+  }
+#endif
+#else
   // GTK4 tries to use EGL instead of GLX by default;
   // there is no public API to manage that
 #if !defined(HAVE_GLES2) && (GTK_MAJOR_VERSION >= 4)
@@ -39,6 +55,7 @@ void OcctGtkTools::gtkGlPlatformSetup()
     aGtkDebug.SetValue(!aGtkDebug.Value().IsEmpty() ? aGtkDebug.Value() + ",gl-glx" : "gl-glx");
     aGtkDebug.Build();
   }
+#endif
 #endif
 #endif
 

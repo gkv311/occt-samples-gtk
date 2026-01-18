@@ -10,18 +10,10 @@
 #include <OpenGl_GraphicDriver.hxx>
 #include <OpenGl_FrameBuffer.hxx>
 
-#if !defined(__APPLE__) && !defined(_WIN32) && defined(__has_include)
-  #if __has_include(<Xw_DisplayConnection.hxx>)
-    #include <Xw_DisplayConnection.hxx>
-    #define USE_XW_DISPLAY
-  #endif
-#endif
-#ifndef USE_XW_DISPLAY
-typedef Aspect_DisplayConnection Xw_DisplayConnection;
-#endif
-
 #ifdef _WIN32
   //
+#elif defined(HAVE_WAYLAND)
+  #include <gdk/gdkwayland.h>
 #else
   #include <gdk/gdkx.h>
   #include <X11/Xlib.h>
@@ -33,7 +25,7 @@ typedef Aspect_DisplayConnection Xw_DisplayConnection;
 OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 {
   Handle(Aspect_DisplayConnection) aDisp;
-#if !defined(__APPLE__) && !defined(_WIN32)
+#if !defined(__APPLE__) && !defined(_WIN32) && !defined(HAVE_WAYLAND)
   aDisp = new Xw_DisplayConnection();
 #endif
   Handle(OpenGl_GraphicDriver) aDriver = new OpenGl_GraphicDriver(aDisp, false);
@@ -73,6 +65,8 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 
 #ifdef HAVE_GLES2
   set_use_es(true);
+#else
+  set_use_es(false);
 #endif
 
   // connect to Gtk::GLArea events
@@ -243,6 +237,37 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
 {
   make_current();
   Graphic3d_Vec2i aLogicalSize(get_width(), get_height());
+#ifdef HAVE_GLES2
+  if (!get_context()->get_use_es())
+  {
+    Message::SendFail() << "Broken configuration: OpenGL ES expected, but dekstop OpenGL is given\n";
+    return;
+  }
+#else
+  if (get_context()->get_use_es())
+  {
+    Message::SendFail() << "Broken configuration: desktop OpenGL expected, but OpenGL ES is given\n";
+    return;
+  }
+#endif
+
+  // check Wayland vs. X11 backend
+  Aspect_Drawable aNativeWin = 0;
+#if defined(HAVE_WAYLAND)
+  struct wl_surface* aWlSurf = gdk_wayland_window_get_wl_surface(gtk_widget_get_window((GtkWidget* )gobj()));
+  if (aWlSurf == nullptr)
+  {
+    Message::SendFail() << "Broken configuration: Wayland surface is expected\n";
+    return;
+  }
+#elif !defined(_WIN32) && !defined(__APPLE__)
+  aNativeWin = gdk_x11_window_get_xid(gtk_widget_get_window((GtkWidget* )gobj()));
+  if (aNativeWin == 0)
+  {
+    Message::SendFail() << "Broken configuration: X11 window is expected\n";
+    return;
+  }
+#endif
 
   try
   {
@@ -255,16 +280,6 @@ void OcctGtkGLAreaViewer::onGlAreaRealized()
     initPixelScaleRatio();
 
     const bool isFirstInit = myView->Window().IsNull();
-    Aspect_Drawable aNativeWin = 0;
-#ifdef HAVE_GLES2
-    //
-#elif defined(_WIN32)
-    //
-#else
-    // Gtk::GLArea creates GLX drawable from Window, so that aGlCtx->Window() is not a Window
-    //aNativeWin = aGlCtx->Window();
-    aNativeWin = gdk_x11_window_get_xid(gtk_widget_get_window((GtkWidget* )gobj()));
-#endif
     if (!OcctGlTools::InitializeGlWindow(myView, aNativeWin, aViewSize, myDevicePixelRatio))
     {
       Gtk::MessageDialog aMsg("Error: OpenGl_Context is unable to wrap OpenGL context", false, Gtk::MESSAGE_ERROR);
