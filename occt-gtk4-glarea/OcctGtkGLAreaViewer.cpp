@@ -86,6 +86,8 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   // Modern controllers do not provide raw multi-touch events (only controllers for dedicated gestures).
   // - Bug in Gtk::GestureClick:
   //   when multiple mouse buttons are pressed, release event doesn't come.
+  //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
+  //   https://gitlab.gnome.org/GNOME/gtkmm/-/issues/168
   // - Bug in Gtk::EventControllerLegacy:
   //   on Windows platform mouse events come with offset (not reproduced on Linux).
   const bool toUseModernControllers = false;
