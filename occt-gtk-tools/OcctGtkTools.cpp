@@ -15,7 +15,12 @@
 void OcctGtkTools::gtkGlPlatformSetup()
 {
 #if defined(_WIN32)
-  //
+  // client-side-decorations cause bug in GTK 4.20
+  // with Gtk::EventControllerLegacy returning events with bogus offset
+  OSD_Environment aBackend("GTK_CSD");
+  aBackend.SetValue("0");
+  aBackend.Build();
+  Message::SendTrace() << "OcctGtkTools: forced GTK_CSD=" << aBackend.Value();
 #elif defined(__APPLE__)
   //
 #else
@@ -28,7 +33,7 @@ void OcctGtkTools::gtkGlPlatformSetup()
   aBackend.SetValue("x11");
 #endif
   aBackend.Build();
-
+  Message::SendTrace() << "OcctGtkTools: forced GDK_BACKEND=" << aBackend.Value();
 
 #ifdef HAVE_WAYLAND
   // TODO GTK 4.14 on Wayland ignores Gtk::GLArea::set_use_es(false) for unknown reason - another bug?
@@ -38,6 +43,7 @@ void OcctGtkTools::gtkGlPlatformSetup()
   {
     aGtkDebug.SetValue(!aGtkDebug.Value().IsEmpty() ? aGtkDebug.Value() + ",gl-prefer-gl" : "gl-prefer-gl");
     aGtkDebug.Build();
+    Message::SendTrace() << "OcctGtkTools: forced GDK_DEBUG=" << aGtkDebug.Value();
   }
 #endif
 #else
@@ -48,12 +54,14 @@ void OcctGtkTools::gtkGlPlatformSetup()
   OSD_Environment aGtkDisable("GDK_DISABLE");
   aGtkDisable.SetValue(!aGtkDisable.Value().IsEmpty() ? aGtkDisable.Value() + ",egl" : "egl");
   aGtkDisable.Build();
+  Message::SendTrace() << "OcctGtkTools: forced GDK_DISABLE=" << aGtkDisable.Value();
 #else
   OSD_Environment aGtkDebug("GDK_DEBUG");
   if (aGtkDebug.Value().IsEmpty())
   {
     aGtkDebug.SetValue(!aGtkDebug.Value().IsEmpty() ? aGtkDebug.Value() + ",gl-glx" : "gl-glx");
     aGtkDebug.Build();
+    Message::SendTrace() << "OcctGtkTools: forced GDK_DEBUG=" << aGtkDebug.Value();
   }
 #endif
 #endif
