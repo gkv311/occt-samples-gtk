@@ -89,8 +89,8 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
   //   https://gitlab.gnome.org/GNOME/gtkmm/-/issues/168
   // - Bug in Gtk::EventControllerLegacy:
-  //   on Windows platform mouse events come with offset (not reproduced on Linux),
-  //   when client-side-decorations are enabled (GTK_CSD=1)
+  //   mouse events come with offset when client-side-decorations are enabled (GTK_CSD=1)
+  //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
   const bool toUseModernControllers = false;
   if (!toUseModernControllers)
   {

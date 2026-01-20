@@ -14,13 +14,18 @@
 // ================================================================
 void OcctGtkTools::gtkGlPlatformSetup()
 {
+#if (GTK_MAJOR_VERSION >= 4)
+  // Gtk::EventControllerLegacy returns bogus coordinates
+  // when client-side-decorations are turned on (as of GTK 4.14-4.20)
+  // https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
+  OSD_Environment aCsd("GTK_CSD");
+  aCsd.SetValue("0");
+  aCsd.Build();
+  Message::SendTrace() << "OcctGtkTools: forced GTK_CSD=" << aCsd.Value();
+#endif
+
 #if defined(_WIN32)
-  // client-side-decorations cause bug in GTK 4.20
-  // with Gtk::EventControllerLegacy returning events with bogus offset
-  OSD_Environment aBackend("GTK_CSD");
-  aBackend.SetValue("0");
-  aBackend.Build();
-  Message::SendTrace() << "OcctGtkTools: forced GTK_CSD=" << aBackend.Value();
+  //
 #elif defined(__APPLE__)
   //
 #else
