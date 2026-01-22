@@ -75,7 +75,7 @@ else()
   include_directories(${OpenCASCADE_INCLUDE_DIR})
   link_directories   (${OpenCASCADE_LIBRARY_DIR})
 endif()
-set (OpenCASCADE_LIBS TKRWMesh TKBinXCAF TKBin TKBinL TKXCAF TKVCAF TKCAF TKV3d TKHLR TKMesh TKService TKShHealing TKPrim TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKLCAF TKCDF TKernel)
+set (OpenCASCADE_LIBS TKV3d TKHLR TKMesh TKService TKShHealing TKPrim TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel)
 
 # compiler flags
 if (MSVC)

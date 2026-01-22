@@ -12,3 +12,5 @@ jobs:
     uses: ./.github/workflows/build_linux_gcc_gtk3.yml
   linux-gtk4:
     uses: ./.github/workflows/build_linux_gcc_gtk4.yml
+  wnt-gtk4:
+    uses: ./.github/workflows/build_wnt.yml

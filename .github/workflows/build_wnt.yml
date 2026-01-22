@@ -1,0 +1,204 @@
+name: Build (Windows/MinGW)
+on:
+  workflow_call:
+
+jobs:
+  # This job performs building using MinGW cross-compilation toolchain on Linux
+  # with GTK4 packages installed from MSYS2 Pacman repositories (without installing MSYS2 itself).
+  #
+  # This works, however final DLLs cannot be loaded on Windows
+  # with 'not found symbol _ZSt21ios_base_library_initv' due to mixture
+  # of GCC versions on Linux (GCC13) and MSYS2 (GCC15) and bug fixes
+  # in GCC14+ for MinGW (unrelated ELF rules applied to MinGW builds).
+  #
+  # Should become more useful when using newer Ubuntu images
+  # (Ubuntu 25.04+ also introduced ucrt64 packages like g++-mingw-w64-x86-64-ucrt64)
+  build-lin-mingw:
+    runs-on: ubuntu-24.04
+    env:
+      TOOLCHAIN_PREFIX: x86_64-w64-mingw32
+      CMAKE_TOOLCHAIN: ${{ github.workspace }}/build/x86_64-w64-mingw32-posix.cmake
+      MSYS_FLAVOR: mingw64
+      MSYS_PREFIX: mingw-w64-x86_64
+      MSYS_UCRT_FLAVOR: ucrt64
+      MSYS_UCRT_PREFIX: mingw-w64-ucrt-x86_64
+    steps:
+    - name: Clone Tree
+      uses: actions/checkout@v6
+      with:
+        path: occt-samples-gtk.git
+        fetch-depth: 1
+    - name: Clone OCCT
+      uses: actions/checkout@v6
+      with:
+        repository: gkv311/OCCT
+        path: occt.git
+        ref: 'v7_7_x'
+        fetch-depth: 1
+    - name: Install Dependencies
+      run: |
+        mkdir "$GITHUB_WORKSPACE/build"
+        cat <<EOF >> "$CMAKE_TOOLCHAIN"
+        set(CMAKE_SYSTEM_NAME Windows)
+        set(CMAKE_C_COMPILER   ${TOOLCHAIN_PREFIX}-gcc-posix)
+        set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++-posix)
+        set(CMAKE_RC_COMPILER  ${TOOLCHAIN_PREFIX}-windres)
+        set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX})
+        set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+        set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+        EOF
+        cat "$CMAKE_TOOLCHAIN"
+        # g++-mingw-w64-x86-64-ucrt64 requires Ubuntu 25.04+
+        sudo apt-get update
+        sudo apt-get install -y \
+          g++ cmake ninja-build \
+          mingw-w64-common mingw-w64-tools binutils-mingw-w64-x86-64 \
+          g++-mingw-w64-x86-64-posix gcc-mingw-w64-x86-64-posix
+    - name: Install Dependencies from MSYS2
+      run: |
+        sudo apt-get install -y pacman-package-manager
+        # ucrt64 (mingw-w64-ucrt-x86_64-gtkmm-4.0) should be used only with g++-mingw-w64-x86-64-ucrt64
+        sudo sh -c "echo '[${{ env.MSYS_FLAVOR }}]' >> /etc/pacman.conf"
+        # TODO fix PGP keys setup
+        sudo sh -c "echo 'SigLevel = Never' >> /etc/pacman.conf"
+        sudo sh -c "echo 'Server = https://mirror.msys2.org/mingw/${{ env.MSYS_FLAVOR }}/' >> /etc/pacman.conf"
+        sudo sh -c "echo 'Server = https://repo.msys2.org/mingw/${{ env.MSYS_FLAVOR }}/' >> /etc/pacman.conf"
+        sudo pacman --noconfirm -Syu
+        sudo pacman --noconfirm -Sy ${{ env.MSYS_PREFIX }}-gtkmm-4.0 ${{ env.MSYS_PREFIX }}-freetype
+    - name: Configure occt
+      run: |
+        # disable most OCCT Modules and specify minimal set of toolkits to build
+        # (BUILD_ADDITIONAL_TOOLKITS) required by sample to speed up building
+        cmake -G Ninja -S $GITHUB_WORKSPACE/occt.git -B "$GITHUB_WORKSPACE/build/occt-make" \
+          -D CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN" \
+          -D CMAKE_BUILD_TYPE="Release" \
+          -D INSTALL_DIR:PATH=$GITHUB_WORKSPACE/install/occt \
+          -D BUILD_RELEASE_DISABLE_EXCEPTIONS:BOOL=OFF \
+          -D BUILD_DOC_Overview:BOOL=OFF \
+          -D BUILD_Inspector:BOOL=OFF \
+          -D BUILD_MODULE_Draw:BOOL=OFF \
+          -D BUILD_MODULE_DataExchange:BOOL=OFF \
+          -D BUILD_MODULE_ApplicationFramework:BOOL=OFF \
+          -D BUILD_MODULE_Visualization:BOOL=OFF \
+          -D BUILD_MODULE_ModelingAlgorithms:BOOL=OFF \
+          -D BUILD_MODULE_DETools:BOOL=OFF \
+          -D BUILD_ADDITIONAL_TOOLKITS:STRING="TKOpenGl TKV3d TKHLR TKMesh TKService TKShHealing TKPrim TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel" \
+          -D USE_FREETYPE:BOOL=ON \
+          -D 3RDPARTY_FREETYPE_INCLUDE_DIR_freetype2:FILEPATH="/$MSYS_FLAVOR/include/freetype2" \
+          -D 3RDPARTY_FREETYPE_INCLUDE_DIR_ft2build:FILEPATH="/$MSYS_FLAVOR/include/freetype2" \
+          -D 3RDPARTY_FREETYPE_LIBRARY_DIR:PATH="/$MSYS_FLAVOR/lib" \
+          -D 3RDPARTY_FREETYPE_LIBRARY:FILEPATH="/$MSYS_FLAVOR/lib/libfreetype.dll.a" \
+          -D 3RDPARTY_FREETYPE_DLL_DIR:PATH="/$MSYS_FLAVOR/bin" \
+          -D 3RDPARTY_FREETYPE_DLL:FILEPATH="/$MSYS_FLAVOR/bin/libfreetype-6.dll" \
+          -D USE_FREEIMAGE:BOOL=OFF
+    - name: Build occt
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/occt-make" --config Release
+    - name: Install occt
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/occt-make" --config Release --target install
+    - name: Configure project
+      run: |
+        export PKG_CONFIG_PATH=
+        export PKG_CONFIG_LIBDIR=/$MSYS_FLAVOR/lib/pkgconfig
+        pkg-config gtkmm-4.0 --libs
+        cmake -G Ninja -S $GITHUB_WORKSPACE/occt-samples-gtk.git -B "$GITHUB_WORKSPACE/build/samples-make" \
+          -D CMAKE_TOOLCHAIN_FILE="$CMAKE_TOOLCHAIN" \
+          -D CMAKE_BUILD_TYPE="Release" \
+          -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install/samples \
+          -D USE_GLES2=FALSE \
+          -D GTK_VERSION=GTK4 \
+          -D OpenCASCADE_DIR=$GITHUB_WORKSPACE/install/occt/cmake
+    - name: Build project
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/samples-make" --config Release
+    - name: Install project
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/samples-make" --config Release --target install
+        # the produced binaries cannot be launched, hence don't waste the time
+        #cp -f -r $GITHUB_WORKSPACE/install/occt/win64/gcc/bin/*.dll $GITHUB_WORKSPACE/install/samples/
+        #cp -f -r /$MSYS_FLAVOR/bin/*.dll $GITHUB_WORKSPACE/install/samples/
+    #- name: Upload build
+    #  uses: actions/upload-artifact@v4
+    #  with:
+    #    name: occt-gtk4-mingw64
+    #    path: ${{ github.workspace }}/install/samples
+
+  build-wnt-mingw:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - name: Clone Tree
+      uses: actions/checkout@v6
+      with:
+        path: occt-samples-gtk.git
+        fetch-depth: 1
+    - name: Clone OCCT
+      uses: actions/checkout@v6
+      with:
+        repository: gkv311/OCCT
+        path: occt.git
+        ref: 'v7_7_x'
+        fetch-depth: 1
+    - uses: msys2/setup-msys2@v2
+      id: msys2
+      with:
+        msystem: UCRT64
+        install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-freetype mingw-w64-ucrt-x86_64-gtkmm-4.0
+    - name: Configure occt
+      run: |
+        # disable most OCCT Modules and specify minimal set of toolkits to build
+        # (BUILD_ADDITIONAL_TOOLKITS) required by sample to speed up building
+        cmake -G Ninja -S $GITHUB_WORKSPACE/occt.git -B "$GITHUB_WORKSPACE/build/occt-make" \
+          -D CMAKE_BUILD_TYPE="Release" \
+          -D INSTALL_DIR:PATH=$GITHUB_WORKSPACE/install/occt \
+          -D BUILD_RELEASE_DISABLE_EXCEPTIONS:BOOL=OFF \
+          -D BUILD_DOC_Overview:BOOL=OFF \
+          -D BUILD_Inspector:BOOL=OFF \
+          -D BUILD_MODULE_Draw:BOOL=OFF \
+          -D BUILD_MODULE_DataExchange:BOOL=OFF \
+          -D BUILD_MODULE_ApplicationFramework:BOOL=OFF \
+          -D BUILD_MODULE_Visualization:BOOL=OFF \
+          -D BUILD_MODULE_ModelingAlgorithms:BOOL=OFF \
+          -D BUILD_MODULE_DETools:BOOL=OFF \
+          -D BUILD_ADDITIONAL_TOOLKITS:STRING="TKOpenGl TKV3d TKHLR TKMesh TKService TKShHealing TKPrim TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel" \
+          -D USE_FREETYPE:BOOL=ON \
+          -D USE_FREEIMAGE:BOOL=OFF
+    - name: Build occt
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/occt-make" --config Release
+    - name: Install occt
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/occt-make" --config Release --target install
+    - name: Configure project
+      run: |
+        cmake -G Ninja -S $GITHUB_WORKSPACE/occt-samples-gtk.git -B "$GITHUB_WORKSPACE/build/samples-make" \
+          -D CMAKE_BUILD_TYPE="Release" \
+          -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install/samples \
+          -D USE_GLES2=FALSE \
+          -D GTK_VERSION=GTK4 \
+          -D OpenCASCADE_DIR=$GITHUB_WORKSPACE/install/occt/cmake
+    - name: Build project
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/samples-make" --config Release
+    - name: Install project
+      env:
+        MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/build/samples-make" --config Release --target install
+        inst_bin=`cygpath -m "$GITHUB_WORKSPACE/install/samples"`
+        occt_bin=`cygpath -m "$GITHUB_WORKSPACE/install/occt/win64/gcc/bin"`
+        msys_bin=`cygpath -m "$MSYS2_LOCATION/ucrt64/bin"`
+        ldd $inst_bin/occt-gtk4-glarea.exe
+        cp -f -r $occt_bin/*.dll $inst_bin/
+        # lookup for DLL dependencies
+        ldd $inst_bin/occt-gtk4-glarea.exe | grep /ucrt64/bin | awk '{print $3}' | xargs -i cp {} $inst_bin/
+        #cp -f -r $msys_bin/*.dll $inst_bin/
+    - name: Upload build
+      uses: actions/upload-artifact@v4
+      with:
+        name: occt-gtk4-gcc-ucrt64
+        path: ${{ github.workspace }}/install/samples
