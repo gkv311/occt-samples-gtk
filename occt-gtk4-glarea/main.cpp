@@ -29,6 +29,26 @@ int main(int theNbArgs, char* theArgVec[])
       --theNbArgs;
       Message::DefaultMessenger()->Printers().First()->SetTraceLevel(Message_Trace);
     }
+    else if (std::strcmp(theArgVec[anArgIter], "--modern") == 0
+          || std::strcmp(theArgVec[anArgIter], "--moderninput") == 0)
+    {
+      OcctGtkGLAreaViewer::ToUseModernEventControllers() = true;
+      if (anArgIter + 1 < theNbArgs)
+        theArgVec[anArgIter] = theArgVec[anArgIter + 1];
+
+      --anArgIter;
+      --theNbArgs;
+    }
+    else if (std::strcmp(theArgVec[anArgIter], "--legacy") == 0
+          || std::strcmp(theArgVec[anArgIter], "--legacyinput") == 0)
+    {
+      OcctGtkGLAreaViewer::ToUseModernEventControllers() = false;
+      if (anArgIter + 1 < theNbArgs)
+        theArgVec[anArgIter] = theArgVec[anArgIter + 1];
+
+      --anArgIter;
+      --theNbArgs;
+    }
   }
 
   // force X11 backend for OpenGL initialization using GLX

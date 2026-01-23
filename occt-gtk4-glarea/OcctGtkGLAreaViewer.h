@@ -21,6 +21,11 @@
 class OcctGtkGLAreaViewer : public Gtk::GLArea, public AIS_ViewController
 {
 public:
+  //! Use 'modern' or 'legacy' (Gtk::EventControllerLegacy) input event controllers.
+  //! Should be set before initialization.
+  static bool& ToUseModernEventControllers();
+
+public:
 
   //! Main constructor.
   OcctGtkGLAreaViewer();

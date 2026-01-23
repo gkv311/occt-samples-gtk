@@ -19,6 +19,15 @@
 #endif
 
 // ================================================================
+// Function : ToUseModernEventControllers
+// ================================================================
+bool& OcctGtkGLAreaViewer::ToUseModernEventControllers()
+{
+  static bool toUseModern = false;
+  return toUseModern;
+}
+
+// ================================================================
 // Function : OcctGtkGLAreaViewer
 // ================================================================
 OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
@@ -91,8 +100,8 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   // - Bug in Gtk::EventControllerLegacy:
   //   mouse events come with offset when client-side-decorations are enabled (GTK_CSD=1)
   //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
-  const bool toUseModernControllers = false;
-  if (!toUseModernControllers)
+  Message::SendTrace() << "GTK4 input controller API: " << (ToUseModernEventControllers() ? "modern" : "legacy");
+  if (!ToUseModernEventControllers())
   {
     // connect to input events using raw controller
     Glib::RefPtr<Gtk::EventControllerLegacy> anEventCtrl = Gtk::EventControllerLegacy::create();
