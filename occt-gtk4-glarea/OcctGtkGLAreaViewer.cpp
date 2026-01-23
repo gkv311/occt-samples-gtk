@@ -361,8 +361,24 @@ void OcctGtkGLAreaViewer::handleViewRedraw(const Handle(AIS_InteractiveContext)&
                                            const Handle(V3d_View)& theView)
 {
   AIS_ViewController::handleViewRedraw(theCtx, theView);
-  if (myToAskNextFrame)
-    queue_draw(); // ask more frames
+  if (myToAskNextFrame != (myAnimationCallback != 0))
+  {
+    if (myToAskNextFrame)
+    {
+      // start animation
+      myAnimationCallback = add_tick_callback([this](const Glib::RefPtr<Gdk::FrameClock>&) -> bool
+      {
+        queue_draw();
+        return true;
+      });
+    }
+    else
+    {
+      // stop animation
+      remove_tick_callback(myAnimationCallback);
+      myAnimationCallback = 0;
+    }
+  }
 }
 
 // ================================================================

@@ -85,6 +85,7 @@ protected:
   Handle(AIS_ViewCube)           myViewCube;  //!< view cube object
   float                          myDevicePixelRatio = 1.0f; //!< device pixel ratio for handling high DPI displays
   TCollection_AsciiString        myGlInfo;
+  guint                          myAnimationCallback = 0;
 
   Aspect_VKeyFlags myKeyModifiers = Aspect_VKeyFlags_NONE;
 
