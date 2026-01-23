@@ -121,9 +121,14 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 
   Glib::RefPtr<Gtk::EventControllerScroll> anEventCtrlScroll = Gtk::EventControllerScroll::create();
   anEventCtrlScroll->set_flags(Gtk::EventControllerScroll::Flags::VERTICAL);
-  anEventCtrlScroll->signal_scroll().connect([this](double theDeltaX, double theDeltaY) -> bool
+  const Gtk::EventControllerScroll* aScrollPtr = anEventCtrlScroll.get();
+  anEventCtrlScroll->signal_scroll().connect([this, aScrollPtr](double theDeltaX, double theDeltaY) -> bool
   {
-    if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, Graphic3d_Vec2d(theDeltaX, theDeltaY)))
+    Graphic3d_Vec2d aDelta(theDeltaX, theDeltaY);
+    if (aScrollPtr->get_unit() == Gdk::ScrollUnit::SURFACE)
+      aDelta = (aDelta * myDevicePixelRatio) / 123.0; // 123 logical pixels from GTK documentation
+
+    if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, aDelta))
       queue_draw();
 
     return true;
@@ -232,6 +237,8 @@ bool OcctGtkGLAreaViewer::onRawEvent(const Glib::RefPtr<const Gdk::Event>& theEv
     {
       Graphic3d_Vec2d aDelta;
       theEvent->get_deltas(aDelta.x(), aDelta.y());
+      if (theEvent->get_scroll_unit() == Gdk::ScrollUnit::SURFACE)
+        aDelta = (aDelta * myDevicePixelRatio) / 123.0; // 123 logical pixels from GTK documentation
 
       Graphic3d_Vec2d aPos;
       theEvent->get_position(aPos.x(), aPos.y());
