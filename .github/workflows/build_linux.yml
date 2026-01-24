@@ -9,6 +9,7 @@ jobs:
     - name: Clone Tree
       uses: actions/checkout@v6
       with:
+        path: occt-samples-gtk.git
         fetch-depth: 1
     - name: Install Dependencies
       run: |
@@ -24,19 +25,25 @@ jobs:
           xvfb scrot
     - name: Configure project
       run: |
-        mkdir "build"
-        cmake -G Ninja -S . -B "./build" -D USE_GLES2=FALSE -D GTK_VERSION=GTK3
+        cmake -S "$GITHUB_WORKSPACE/occt-samples-gtk.git" -B "$GITHUB_WORKSPACE/occt-samples-gtk-make" -G Ninja \
+              -D CMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/occt-samples-gtk" \
+              -D GTK_VERSION=GTK3
     - name: Build project
       run: |
-        cmake --build "./build" --config Release
+        cmake --build "$GITHUB_WORKSPACE/occt-samples-gtk-make" --config Release
+    - name: Install project
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/occt-samples-gtk-make" --config Release --target install
     - name: Run tests
       run: |
-        xvfb-run --server-args="-screen 0 800x600x24" ./.github/workflows/screenshot.sh ./build/occt-gtk3-glarea/occt-gtk3-glarea ./build/occt-sample-gtk3.png 5
+        xvfb-run --server-args="-screen 0 800x600x24" \
+                 $GITHUB_WORKSPACE/occt-samples-gtk.git/.github/workflows/screenshot.sh \
+                 $GITHUB_WORKSPACE/occt-samples-gtk/occt-gtk3-glarea $GITHUB_WORKSPACE/occt-samples-gtk/occt-sample-gtk3.png 5
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: occt-gtk3-linux
-        path: ./build/*.png
+        path: occt-samples-gtk/*.png
 
   linux-gcc-gtk4:
     runs-on: ubuntu-24.04
@@ -44,6 +51,7 @@ jobs:
     - name: Clone Tree
       uses: actions/checkout@v6
       with:
+        path: occt-samples-gtk.git
         fetch-depth: 1
     - name: Install Dependencies
       run: |
@@ -59,16 +67,22 @@ jobs:
           xvfb scrot
     - name: Configure project
       run: |
-        mkdir "build"
-        cmake -G Ninja -S . -B "./build" -D USE_GLES2=FALSE -D GTK_VERSION=GTK4
+        cmake -S "$GITHUB_WORKSPACE/occt-samples-gtk.git" -B "$GITHUB_WORKSPACE/occt-samples-gtk-make" -G Ninja \
+              -D CMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/occt-samples-gtk" \
+              -D GTK_VERSION=GTK4
     - name: Build project
       run: |
-        cmake --build "./build" --config Release
+        cmake --build "$GITHUB_WORKSPACE/occt-samples-gtk-make" --config Release
+    - name: Install project
+      run: |
+        cmake --build "$GITHUB_WORKSPACE/occt-samples-gtk-make" --config Release --target install
     - name: Run tests
       run: |
-        xvfb-run --server-args="-screen 0 800x600x24" ./.github/workflows/screenshot.sh ./build/occt-gtk4-glarea/occt-gtk4-glarea ./build/occt-sample-gtk4.png 5
+        xvfb-run --server-args="-screen 0 800x600x24" \
+                 $GITHUB_WORKSPACE/occt-samples-gtk.git/.github/workflows/screenshot.sh \
+                 $GITHUB_WORKSPACE/occt-samples-gtk/occt-gtk4-glarea $GITHUB_WORKSPACE/occt-samples-gtk/occt-sample-gtk4.png 5
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: occt-gtk4-linux
-        path: ./build/*.png
+        path: occt-samples-gtk/*.png
