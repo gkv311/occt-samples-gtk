@@ -40,20 +40,14 @@ public:
 
 protected:
 
-  //! Handle mouse movement event.
-  bool onMouseMotion(GdkEventMotion* theEvent);
-
-  //! Handle mouse button press event.
-  bool onMouseButtonPressed(GdkEventButton* theEvent);
-
-  //! Handle mouse button released event.
-  bool onMouseButtonReleased(GdkEventButton* theEvent);
-
-  //! Handle mouse scroll event.
-  bool onMouseScroll(GdkEventScroll* theEvent);
-
   //! Handle multi-touch event.
   bool onTouch(GdkEventTouch* theEvent);
+
+  //! Handle key event.
+  bool onKey(GdkEventKey* theEvent);
+
+  //! Handle input key.
+  void processKeyPress(Aspect_VKey theKey);
 
 protected:
 
@@ -67,6 +61,9 @@ protected:
   bool onGlAreaRender(const Glib::RefPtr<Gdk::GLContext>& theGlCtx);
 
 protected:
+
+  //! Setup input callbacks.
+  void setupInputCallbacks();
 
   //! Print OpenGL context info.
   void dumpGlInfo(bool theIsBasic, bool theToPrint);

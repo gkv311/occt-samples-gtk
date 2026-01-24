@@ -24,6 +24,10 @@
 // ================================================================
 OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 {
+  // receive keyboard events when focused
+  set_can_focus(true);
+  set_focus_on_click(true);
+
   Handle(Aspect_DisplayConnection) aDisp;
 #if !defined(__APPLE__) && !defined(_WIN32) && !defined(HAVE_WAYLAND)
   aDisp = new Xw_DisplayConnection();
@@ -67,6 +71,14 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   set_use_es(false);
 #endif
 
+  setupInputCallbacks();
+}
+
+// ================================================================
+// Function : setupInputCallbacks
+// ================================================================
+void OcctGtkGLAreaViewer::setupInputCallbacks()
+{
   // connect to Gtk::GLArea events
   signal_realize()  .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRealized));
   // important that the unrealize signal calls our handler to clean up
@@ -79,19 +91,74 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   // might work as expected on other systems that don't generate emulated events
   const bool toEnableMultitouch = false;
 
-  // connect to mouse input events
+  // connect to input events
   Gdk::EventMask anEventFilter = Gdk::POINTER_MOTION_MASK | Gdk::BUTTON_PRESS_MASK | Gdk::BUTTON_RELEASE_MASK
-                               | Gdk::SMOOTH_SCROLL_MASK  | Gdk::FOCUS_CHANGE_MASK;
+                               | Gdk::SMOOTH_SCROLL_MASK  | Gdk::FOCUS_CHANGE_MASK
+                               | Gdk::KEY_PRESS_MASK | Gdk::KEY_RELEASE_MASK;
   if (toEnableMultitouch)
     anEventFilter |= Gdk::TOUCH_MASK;
 
   add_events(anEventFilter);
-  signal_motion_notify_event() .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseMotion), false);
-  signal_button_press_event()  .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonPressed), false);
-  signal_button_release_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseButtonReleased), false);
-  signal_scroll_event()        .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onMouseScroll), false);
+
+  signal_motion_notify_event().connect([this](GdkEventMotion* theEvent) -> bool
+  {
+    if (OcctGtkTools::gtkHandleMotionEvent(*this, myView, theEvent))
+      queue_draw();
+
+    return true;
+  }, false);
+
+  signal_button_press_event().connect([this](GdkEventButton* theEvent) -> bool
+  {
+    if (get_focus_on_click())
+      grab_focus(); // grab keyboard input
+
+    if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, theEvent))
+      queue_draw();
+
+    return true;
+  }, false);
+
+  signal_button_release_event().connect([this](GdkEventButton* theEvent) -> bool
+  {
+    if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, theEvent))
+      queue_draw();
+
+    return true;
+  }, false);
+
+  signal_scroll_event().connect([this](GdkEventScroll* theEvent) -> bool
+  {
+    if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, theEvent))
+      queue_draw();
+
+    return true;
+  }, false);
+
+  signal_key_press_event().connect([this](GdkEventKey* theEvent) -> bool
+  {
+    return onKey(theEvent);
+  }, false);
+
+  signal_key_release_event().connect([this](GdkEventKey* theEvent) -> bool
+  {
+    return onKey(theEvent);
+  }, false);
+
+  signal_focus_in_event().connect([this](GdkEventFocus*) -> bool
+  {
+    AIS_ViewController::ProcessFocus(true);
+    return false;
+  }, false);
+
+  signal_focus_out_event().connect([this](GdkEventFocus*) -> bool
+  {
+    AIS_ViewController::ProcessFocus(false);
+    return false;
+  }, false);
+
   if (toEnableMultitouch)
-    signal_touch_event()       .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onTouch), false);
+    signal_touch_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onTouch), false);
 }
 
 // ================================================================
@@ -100,50 +167,6 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
 OcctGtkGLAreaViewer::~OcctGtkGLAreaViewer()
 {
   //
-}
-
-// ================================================================
-// Function : onMouseMotion
-// ================================================================
-bool OcctGtkGLAreaViewer::onMouseMotion(GdkEventMotion* theEvent)
-{
-  if (OcctGtkTools::gtkHandleMotionEvent(*this, myView, theEvent))
-    queue_draw();
-
-  return true;
-}
-
-// ================================================================
-// Function : onMouseButtonPressed
-// ================================================================
-bool OcctGtkGLAreaViewer::onMouseButtonPressed(GdkEventButton* theEvent)
-{
-  if (OcctGtkTools::gtkHandleButtonPressedEvent(*this, myView, theEvent))
-    queue_draw();
-
-  return true;
-}
-
-// ================================================================
-// Function : onMouseButtonReleased
-// ================================================================
-bool OcctGtkGLAreaViewer::onMouseButtonReleased(GdkEventButton* theEvent)
-{
-  if (OcctGtkTools::gtkHandleButtonReleasedEvent(*this, myView, theEvent))
-    queue_draw();
-
-  return true;
-}
-
-// ================================================================
-// Function : onMouseScroll
-// ================================================================
-bool OcctGtkGLAreaViewer::onMouseScroll(GdkEventScroll* theEvent)
-{
-  if (OcctGtkTools::gtkHandleScrollEvent(*this, myView, theEvent))
-    queue_draw();
-
-  return true;
 }
 
 // ================================================================
@@ -181,6 +204,52 @@ bool OcctGtkGLAreaViewer::onTouch(GdkEventTouch* theEvent)
     queue_draw();
 
   return true;
+}
+
+// ================================================================
+// Function : onKey
+// ================================================================
+bool OcctGtkGLAreaViewer::onKey(GdkEventKey* theEvent)
+{
+  const Aspect_VKey aVKey = OcctGtkTools::gtkKey2VKey(theEvent->keyval, guint(-1));
+  if (aVKey == Aspect_VKey_UNKNOWN)
+    return false;
+
+  const double aTimeStamp = AIS_ViewController::EventTime();
+  if (theEvent->type == GDK_KEY_PRESS)
+    AIS_ViewController::KeyDown(aVKey, aTimeStamp);
+  else
+    AIS_ViewController::KeyUp(aVKey, aTimeStamp);
+
+  if (theEvent->type == GDK_KEY_PRESS)
+    processKeyPress(aVKey);
+
+  AIS_ViewController::ProcessInput();
+  return true;
+}
+
+// ================================================================
+// Function : processKeyPress
+// ================================================================
+void OcctGtkGLAreaViewer::processKeyPress(Aspect_VKey theKey)
+{
+  if (myView.IsNull())
+    return;
+
+  switch (theKey)
+  {
+    case Aspect_VKey_Escape:
+    {
+      std::exit(0);
+      break;
+    }
+    case Aspect_VKey_F:
+    {
+      myView->FitAll(0.01, false);
+      queue_draw();
+      break;
+    }
+  }
 }
 
 // ================================================================

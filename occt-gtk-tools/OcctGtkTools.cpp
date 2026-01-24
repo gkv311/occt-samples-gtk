@@ -4,7 +4,6 @@
 
 #include <Aspect_ScrollDelta.hxx>
 #include <Message.hxx>
-#include <OpenGl_Caps.hxx>
 #include <OSD_Environment.hxx>
 #include <Standard_Version.hxx>
 #include <V3d_View.hxx>
@@ -269,11 +268,11 @@ bool OcctGtkTools::gtkHandleMotionEvent(Aspect_WindowInputListener& theListener,
 }
 
 // ================================================================
-// Function : gtkHandleButtonPressedEvent
+// Function : gtkHandleButtonEvent
 // ================================================================
-bool OcctGtkTools::gtkHandleButtonPressedEvent(Aspect_WindowInputListener& theListener,
-                                               const Handle(V3d_View)& theView,
-                                               const GdkEventButton* theEvent)
+bool OcctGtkTools::gtkHandleButtonEvent(Aspect_WindowInputListener& theListener,
+                                        const Handle(V3d_View)& theView,
+                                        const GdkEventButton* theEvent)
 {
   if (theView->Window().IsNull())
     return false;
@@ -285,27 +284,9 @@ bool OcctGtkTools::gtkHandleButtonPressedEvent(Aspect_WindowInputListener& theLi
   if (aButton == Aspect_VKeyMouse_NONE)
     return false;
 
-  return theListener.PressMouseButton(aPnt2i, aButton, aFlags, false);
-}
-
-// ================================================================
-// Function : gtkHandleButtonReleasedEvent
-// ================================================================
-bool OcctGtkTools::gtkHandleButtonReleasedEvent(Aspect_WindowInputListener& theListener,
-                                                const Handle(V3d_View)& theView,
-                                                const GdkEventButton* theEvent)
-{
-  if (theView->Window().IsNull())
-    return false;
-
-  const Graphic3d_Vec2d aPnt2d(theEvent->x, theEvent->y);
-  const Graphic3d_Vec2i aPnt2i(theView->Window()->ConvertPointToBacking(aPnt2d) + Graphic3d_Vec2d(0.5));
-  const Aspect_VKeyMouse aButton = OcctGtkTools::gtkMouseButton2VKey(theEvent->button);
-  const Aspect_VKeyFlags aFlags  = OcctGtkTools::gtkMouseFlags2VKeys(theEvent->state);
-  if (aButton == Aspect_VKeyMouse_NONE)
-    return false;
-
-  return theListener.ReleaseMouseButton(aPnt2i, aButton, aFlags, false);
+  return theEvent->type == GDK_BUTTON_PRESS
+       ? theListener.PressMouseButton(aPnt2i, aButton, aFlags, false)
+       : theListener.ReleaseMouseButton(aPnt2i, aButton, aFlags, false);
 }
 
 // ================================================================
