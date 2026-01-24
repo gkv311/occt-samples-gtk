@@ -13,13 +13,13 @@ jobs:
         fetch-depth: 1
     - name: Install Dependencies
       run: |
+        # libtbb-dev is added as a workaround for broken CMake configuration files within libocct
         sudo apt-get update
         sudo apt-get install -y \
           g++ cmake ninja-build \
-          libocct-draw-dev libocct-visualization-dev libocct-ocaf-dev libocct-modeling-data-dev \
-          libocct-modeling-algorithms-dev libocct-foundation-dev libocct-data-exchange-dev \
+          libocct-visualization-dev libocct-modeling-data-dev \
+          libocct-modeling-algorithms-dev libocct-foundation-dev \
           libgl-dev libegl-dev \
-          tcllib tklib tcl-dev tk-dev \
           libtbb-dev \
           libgtkmm-3.0-dev \
           xvfb scrot
@@ -55,13 +55,13 @@ jobs:
         fetch-depth: 1
     - name: Install Dependencies
       run: |
+        # libtbb-dev is added as a workaround for broken CMake configuration files within libocct
         sudo apt-get update
         sudo apt-get install -y \
           g++ cmake ninja-build \
-          libocct-draw-dev libocct-visualization-dev libocct-ocaf-dev libocct-modeling-data-dev \
-          libocct-modeling-algorithms-dev libocct-foundation-dev libocct-data-exchange-dev \
+          libocct-visualization-dev libocct-modeling-data-dev \
+          libocct-modeling-algorithms-dev libocct-foundation-dev \
           libgl-dev libegl-dev \
-          tcllib tklib tcl-dev tk-dev \
           libtbb-dev \
           libgtkmm-4.0-dev \
           xvfb scrot
