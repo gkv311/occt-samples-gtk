@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Kirill Gavrilov
+// Copyright (c) 2023-2026 Kirill Gavrilov
 
 #include "OcctGtkGLAreaViewer.h"
 
@@ -35,9 +35,7 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   aDriver->ChangeOptions().buffersOpaqueAlpha = true;
   // offscreen FBOs should be always used
   aDriver->ChangeOptions().useSystemBuffer = false;
-  // GTK3/GTK4 creates Core Profile when possible
-  // (Compatible Profile created only as a fallback)
-  // with no option to manage this behavior!
+  // GTK3 creates Core Profile when possible with no option to manage this behavior!
   aDriver->ChangeOptions().contextCompatible = false;
 
   // create viewer

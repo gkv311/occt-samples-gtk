@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Kirill Gavrilov
+// Copyright (c) 2023-2026 Kirill Gavrilov
 
 #include "OcctGtkWindowSample.h"
 

@@ -22,9 +22,12 @@ class OcctGtkTools
 {
 public: //! @name GTK application pre-setup for OCCT 3D Viewer integration
 
-  //! Perform global GTK platform setup - to be called before QApplication creation.
+  //! Perform global GTK platform setup - to be called before Gtk::Application creation.
   //! Defines platform plugin to load (e.g. xcb on Linux)
   //! and graphic driver (e.g. desktop OpenGL with desired profile/surface).
+  //!
+  //! Environment variables GDK_BACKEND, GDK_DISABLE, GDK_DEBUG, GTK_CSD are used,
+  //! as GTK intentionally doesn't provide C API for these.
   static void gtkGlPlatformSetup();
 
 public: //! @name methods for wrapping GTK input events into Aspect_WindowInputListener events

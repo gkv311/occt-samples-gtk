@@ -1,10 +1,9 @@
-// Copyright (c) 2023 Kirill Gavrilov
+// Copyright (c) 2023-2026 Kirill Gavrilov
 
 #ifndef _OcctGtkGLAreaViewer_HeaderFile
 #define _OcctGtkGLAreaViewer_HeaderFile
 
-// workaround macros clash with Gtk::Collation::UNICODE
-// (UNICODE is a standard macros used by WinAPI)
+// workaround macros clash with Gtk::Collation::UNICODE (UNICODE is a standard macros used by WinAPI)
 #ifdef UNICODE
 #undef UNICODE
 #endif

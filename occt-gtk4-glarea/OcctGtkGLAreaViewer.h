@@ -1,10 +1,9 @@
-// Copyright (c) 2023 Kirill Gavrilov
+// Copyright (c) 2023-2026 Kirill Gavrilov
 
 #ifndef _OcctGtkGLAreaViewer_HeaderFile
 #define _OcctGtkGLAreaViewer_HeaderFile
 
-// workaround macros clash with Gtk::Collation::UNICODE
-// (UNICODE is a standard macros used by WinAPI)
+// workaround macros clash with Gtk::Collation::UNICODE (UNICODE is a standard macros used by WinAPI)
 #ifdef UNICODE
 #undef UNICODE
 #endif
@@ -23,12 +22,22 @@ class OcctGtkGLAreaViewer : public Gtk::GLArea, public AIS_ViewController
 public:
   //! Use 'modern' or 'legacy' (Gtk::EventControllerLegacy) input event controllers.
   //! Should be set before initialization.
-  static bool& ToUseModernEventControllers();
+  //!
+  //! Gtk::EventControllerLegacy is much simpler to configure with the Viewer.
+  //! Modern controllers do not provide raw multi-touch events (only controllers for dedicated gestures).
+  //! - Bug in Gtk::GestureClick:
+  //!   when multiple mouse buttons are pressed, release event doesn't come.
+  //!   https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
+  //!   https://gitlab.gnome.org/GNOME/gtkmm/-/issues/168
+  //! - Bug in Gtk::EventControllerLegacy:
+  //!   mouse events come with offset when client-side-decorations are enabled (GTK_CSD=1)
+  //!   https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
+  static bool& ToUseModernInput();
 
 public:
 
   //! Main constructor.
-  OcctGtkGLAreaViewer();
+  explicit OcctGtkGLAreaViewer(bool theUseModernInput = ToUseModernInput());
 
   //! Destructor.
   virtual ~OcctGtkGLAreaViewer();
@@ -46,6 +55,9 @@ public:
   const TCollection_AsciiString& GetGlInfo() const { return myGlInfo; }
 
 protected: //! @name callbacks for modern-style controllers
+
+  //! Connect to input events using 'modern' controllers (please check bugs).
+  void addModernEventControllers();
 
   //! Update modifiers.
   void updateModifiers();

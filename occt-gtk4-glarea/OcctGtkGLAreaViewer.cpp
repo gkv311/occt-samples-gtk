@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Kirill Gavrilov
+// Copyright (c) 2023-2026 Kirill Gavrilov
 
 #include "OcctGtkGLAreaViewer.h"
 
@@ -19,9 +19,9 @@
 #endif
 
 // ================================================================
-// Function : ToUseModernEventControllers
+// Function : ToUseModernInput
 // ================================================================
-bool& OcctGtkGLAreaViewer::ToUseModernEventControllers()
+bool& OcctGtkGLAreaViewer::ToUseModernInput()
 {
   static bool toUseModern = false;
   return toUseModern;
@@ -30,7 +30,7 @@ bool& OcctGtkGLAreaViewer::ToUseModernEventControllers()
 // ================================================================
 // Function : OcctGtkGLAreaViewer
 // ================================================================
-OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
+OcctGtkGLAreaViewer::OcctGtkGLAreaViewer(bool theUseModernInput)
 {
   // receive keyboard events when focused
   set_can_focus(true);
@@ -48,9 +48,7 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   aDriver->ChangeOptions().buffersOpaqueAlpha = true;
   // offscreen FBOs should be always used
   aDriver->ChangeOptions().useSystemBuffer = false;
-  // GTK3/GTK4 creates Core Profile when possible
-  // (Compatible Profile created only as a fallback)
-  // with no option to manage this behavior!
+  // GTK4 creates Core Profile when possible with no option to manage this behavior!
   aDriver->ChangeOptions().contextCompatible = false;
 
   // create viewer
@@ -90,27 +88,29 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   signal_unrealize().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaReleased), false);
   signal_render()   .connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onGlAreaRender), false);
 
-  // 'Legacy' (Gtk::EventControllerLegacy) vs. 'modern' input controllers.
-  // Gtk::EventControllerLegacy is much simpler to configure with the Viewer.
-  // Modern controllers do not provide raw multi-touch events (only controllers for dedicated gestures).
-  // - Bug in Gtk::GestureClick:
-  //   when multiple mouse buttons are pressed, release event doesn't come.
-  //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
-  //   https://gitlab.gnome.org/GNOME/gtkmm/-/issues/168
-  // - Bug in Gtk::EventControllerLegacy:
-  //   mouse events come with offset when client-side-decorations are enabled (GTK_CSD=1)
-  //   https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
-  Message::SendTrace() << "GTK4 input controller API: " << (ToUseModernEventControllers() ? "modern" : "legacy");
-  if (!ToUseModernEventControllers())
+  if (theUseModernInput)
   {
-    // connect to input events using raw controller
+    addModernEventControllers();
+  }
+  else
+  {
+    // TODO mouse/touch events come with offset from Gtk::EventControllerLegacy
+    // when client-side-decorations are enabled (GTK_CSD=1)
+    // https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
+    Message::SendTrace() << "OcctGtkGLAreaViewer: using 'legacy' GTK4 input controllers API";
     Glib::RefPtr<Gtk::EventControllerLegacy> anEventCtrl = Gtk::EventControllerLegacy::create();
     anEventCtrl->signal_event().connect(sigc::mem_fun(*this, &OcctGtkGLAreaViewer::onRawEvent), false);
     add_controller(anEventCtrl);
-    return;
   }
+}
 
-  // connect to input events using 'modern' controllers (but it is buggy)
+// ================================================================
+// Function : addModernEventControllers
+// ================================================================
+void OcctGtkGLAreaViewer::addModernEventControllers()
+{
+  Message::SendTrace() << "OcctGtkGLAreaViewer: using 'modern' GTK4 input controllers API";
+
   Glib::RefPtr<Gtk::EventControllerMotion> anEventCtrlMotion = Gtk::EventControllerMotion::create();
   anEventCtrlMotion->signal_motion().connect([this](double theX, double theY)
   {
@@ -135,6 +135,8 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   }, false);
   add_controller(anEventCtrlScroll);
 
+  // TODO when multiple mouse buttons are pressed, release event doesn't come from Gtk::GestureClick.
+  // https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
   Glib::RefPtr<Gtk::GestureClick> anEventCtrlClick = Gtk::GestureClick::create();
   anEventCtrlClick->set_button(0); // listen to all buttons
   const Gtk::GestureClick* aClickPtr = anEventCtrlClick.get();
@@ -155,16 +157,12 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   }, false);
   add_controller(anEventCtrlClick);
 
-  /// TODO why this doesn't work without forwarding from parent Gtk::Window? events do not reset modifiers...
+  // TODO there is no event from Gtk::EventControllerKey to reset modifiers...
   Glib::RefPtr<Gtk::EventControllerKey> anEventCtrlKey = Gtk::EventControllerKey::create();
   anEventCtrlKey->signal_modifiers().connect([this](Gdk::ModifierType theType) -> bool
   {
-    /// TODO this doesn't work as expected
-    (void)theType;
-    //const Aspect_VKeyFlags anOldFlags = myKeyModifiers;
-    //myKeyModifiers = OcctGtkTools::gtkModifiers2VKeys(theType);
-    //return true;
-    return false;
+    (void)theType; //myKeyModifiers = OcctGtkTools::gtkModifiers2VKeys(theType);
+    return false;  //return true;
   }, false);
   anEventCtrlKey->signal_key_pressed().connect([this](guint theKeyVal, guint theKeyCode, Gdk::ModifierType theType) -> bool
                                                { return onKey(theKeyVal, theKeyCode, theType, true); }, false);
@@ -173,8 +171,7 @@ OcctGtkGLAreaViewer::OcctGtkGLAreaViewer()
   add_controller(anEventCtrlKey);
 
   Glib::RefPtr<Gtk::EventControllerFocus> anEventCtrlFocus = Gtk::EventControllerFocus::create();
-  anEventCtrlFocus->signal_enter().connect([this]()
-  {
+  anEventCtrlFocus->signal_enter().connect([this]() {
     AIS_ViewController::ProcessFocus(true);
   }, false);
   anEventCtrlFocus->signal_leave().connect([this]()
