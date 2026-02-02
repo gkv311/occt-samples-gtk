@@ -135,8 +135,6 @@ void OcctGtkGLAreaViewer::addModernEventControllers()
   }, false);
   add_controller(anEventCtrlScroll);
 
-  // TODO when multiple mouse buttons are pressed, release event doesn't come from Gtk::GestureClick.
-  // https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
   Glib::RefPtr<Gtk::GestureClick> anEventCtrlClick = Gtk::GestureClick::create();
   anEventCtrlClick->set_button(0); // listen to all buttons
   const Gtk::GestureClick* aClickPtr = anEventCtrlClick.get();
@@ -153,6 +151,13 @@ void OcctGtkGLAreaViewer::addModernEventControllers()
   {
     if (OcctGtkTools::gtkHandleButtonEvent(*this, myView, Graphic3d_Vec2d(theX, theY),
                                            aClickPtr->get_current_button(), myKeyModifiers, false))
+      queue_draw();
+  }, false);
+  anEventCtrlClick->signal_cancel().connect([this, aClickPtr](Gdk::EventSequence* )
+  {
+    // when multiple mouse buttons are pressed, cancel event comes from Gtk::GestureClick instead of release
+    const Aspect_VKeyMouse aButton = OcctGtkTools::gtkMouseButton2VKey(aClickPtr->get_current_button());
+    if (AIS_ViewController::ReleaseMouseButton(AIS_ViewController::LastMousePosition(), aButton, myKeyModifiers, false))
       queue_draw();
   }, false);
   add_controller(anEventCtrlClick);

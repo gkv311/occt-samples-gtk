@@ -25,10 +25,6 @@ public:
   //!
   //! Gtk::EventControllerLegacy is much simpler to configure with the Viewer.
   //! Modern controllers do not provide raw multi-touch events (only controllers for dedicated gestures).
-  //! - Bug in Gtk::GestureClick:
-  //!   when multiple mouse buttons are pressed, release event doesn't come.
-  //!   https://gitlab.gnome.org/GNOME/gtk/-/issues/7752
-  //!   https://gitlab.gnome.org/GNOME/gtkmm/-/issues/168
   //! - Bug in Gtk::EventControllerLegacy:
   //!   mouse events come with offset when client-side-decorations are enabled (GTK_CSD=1)
   //!   https://gitlab.gnome.org/GNOME/gtk/-/issues/7983
