@@ -40,7 +40,7 @@ jobs:
                  $GITHUB_WORKSPACE/occt-samples-gtk.git/.github/workflows/screenshot.sh \
                  $GITHUB_WORKSPACE/occt-samples-gtk/occt-gtk3-glarea $GITHUB_WORKSPACE/occt-samples-gtk/occt-sample-gtk3.png 5
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: occt-gtk3-linux
         path: occt-samples-gtk/*.png
@@ -82,7 +82,7 @@ jobs:
                  $GITHUB_WORKSPACE/occt-samples-gtk.git/.github/workflows/screenshot.sh \
                  $GITHUB_WORKSPACE/occt-samples-gtk/occt-gtk4-glarea $GITHUB_WORKSPACE/occt-samples-gtk/occt-sample-gtk4.png 5
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: occt-gtk4-linux
         path: occt-samples-gtk/*.png

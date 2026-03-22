@@ -120,7 +120,7 @@ jobs:
         #cp -f -r $GITHUB_WORKSPACE/install/occt/win64/gcc/bin/*.dll $GITHUB_WORKSPACE/install/samples/
         #cp -f -r /$MSYS_FLAVOR/bin/*.dll $GITHUB_WORKSPACE/install/samples/
     #- name: Upload build
-    #  uses: actions/upload-artifact@v4
+    #  uses: actions/upload-artifact@v6
     #  with:
     #    name: occt-gtk4-mingw64
     #    path: ${{ github.workspace }}/install/samples
@@ -198,7 +198,7 @@ jobs:
         ldd $inst_bin/occt-gtk4-glarea.exe | grep /ucrt64/bin | awk '{print $3}' | xargs -i cp {} $inst_bin/
         #cp -f -r $msys_bin/*.dll $inst_bin/
     - name: Upload build
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: occt-gtk4-gcc-ucrt64
         path: ${{ github.workspace }}/install/samples
